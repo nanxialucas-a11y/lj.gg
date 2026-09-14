@@ -135,122 +135,168 @@
             <p>free, unblocked, ad-free games that can be played anywhere</p>
         </section>
 
-        <section class="grid">
-
-            <div class="card">
-                <img src="/images/games/polytrackthumbnail.webp" alt="PolyTrack">
-                <h2>PolyTrack</h2>
-                <p>low poly racing game, a classic</p>
-                <a href="/games/polytrack/" class="button">play</a>
-            </div>
-
-            <div class="card">
-                <img src="/images/games/ovothumbnail.webp" alt="OvO">
-                <h2>OvO</h2>
-                <p>fun lightweight platformer</p>
-                <a href="/games/ovo/" class="button">play</a>
-            </div>
-
-            <div class="card">
-                <img src="/images/games/rocketleaguethumbnail.png" alt="Rocket League">
-                <h2>Rocket League</h2>
-                <p>car soccer game</p>
-                <a href="/games/rocketleague/" class="button">play</a>
-            </div>
-
-            <div class="card">
-                <img src="/images/games/gdlitethumbnail.png" alt="Geometry Dash Lite">
-                <h2>Geometry Dash Lite</h2>
-                <p>a smaller version of geometry dash</p>
-                <a href="/games/gdlite/" class="button">play</a>
-            </div>
-
-            <div class="card">
-                <img src="/images/games/tungsahurhorrorthumbnail.png" alt="Tung Sahur Horror">
-                <h2>Tung Sahur Horror</h2>
-                <p>retexture of the horror game granny</p>
-                <a href="/games/tungsahurhorror/" class="button">play</a>
-            </div>
-
-            <div class="card">
-                <img src="/images/games/treeshateyouthumbnail.jpg" alt="Trees Hate You">
-                <h2>Trees Hate You</h2>
-                <p>a innocent seeming game, where trees try to kill you at every moment</p>
-                <a href="/games/treeshateyou/" class="button">play</a>
-            </div>
-
-            <div class="card">
-                <img src="/images/games/eugeneslifethumbnail.jpg" alt="Eugene's Life">
-                <h2>Eugene's Life</h2>
-                <p>a squishy goofy ahh platformer game, great fun</p>
-                <a href="/games/eugeneslife/" class="button">play</a>
-            </div>
-
-            <div class="card">
-                <img src="/images/games/escaperoadcity2thumbnail.png" alt="Escape Road City 2">
-                <h2>Escape Road City 2</h2>
-                <p>play as a criminal who just robbed a car. gain stars as you evade police</p>
-                <a href="/games/escaperoadcity2/" class="button">play</a>
-            </div>
-
-            <div class="card">
-                <img src="/images/games/fnafsisterlocationthumbnail.png" alt="FNAF: Sister Location">
-                <h2>FNAF: Sister Location</h2>
-                <p>play as a technician in a horror circus (JUMPSCARE WARNING)</p>
-                <a href="/games/fnafsisterlocation/" class="button">CURRENTLY BROKEN</a>
-            </div>
-
-            <div class="card">
-                <img src="/images/games/bigflappytowertinysquarethumbnail.webp" alt="Big Flappy Tower Tiny Square">
-                <h2>Big Flappy Tower Tiny Square</h2>
-                <p>an incredibly difficult platformer with a unique flapping mechanic</p>
-                <a href="/games/bigflappytowertinysquare/" class="button">play</a>
-            </div>
-
-            <div class="card">
-                <img src="/images/games/minecraft.png" alt="Minecraft">
-	        <h2>Minecraft 1.12</h2>
-                <p>online no download needed official version of 1.12</p>
-                <a href="/games/minecraft/" class="button">play</a>
-            </div>
-
-            <div class="card">
-                <img src="/images/games/slicemaster.jpg" alt="Slice Master">
-	        <h2>Slice Master</h2>
-                <p>an amsr slicing game</p>
-                <a href="/games/slicemaster/" class="button">play</a>
-            </div>
-
-	    <div class="card">
-                <img src="/images/games/brawlstars.jpg" alt="Brawl Stars">
-	        <h2>Brawl Stars</h2>
-                <p>brawl stars unity remake</p>
-                <a href="/games/brawlstars/" class="button">play</a>
-            </div>
-
-	    <div class="card">
-                <img src="/images/games/subwaysurfers.webp" alt="Subway Surfers: Miami">
-	        <h2>Subway Surfers: Miami</h2>
-                <p>subway surfers miami edition</p>
-                <a href="/games/subwaysurfers/" class="button">play</a>
-            </div>
-
-	    <div class="card">
-                <img src="/images/games/tinyfishing.webp" alt="Tiny Fishing">
-	        <h2>Tiny Fishing</h2>
-                <p>chill lil game about fishing</p>
-                <a href="/games/tinyfishing/" class="button">play</a>
-            </div>
-
-	    <div class="card">
-                <img src="/images/games/bloonstd5.jpg" alt="Bloons TD 5">
-	        <h2>Bloons TD 5</h2>
-                <p>ported flash version of btd5</p>
-                <a href="/games/bloonstd5/" class="button">play</a>
-            </div>
-
-        </section>
+        <section class="grid" id="game-grid"></section>
 
     </main>
+
+    <script>
+        // ============================================================
+        // GAME ORDER LIST
+        // To reorder the cards on the page, just move entries around
+        // in this array — top of the array = top-left of the grid.
+        // Copy/paste a whole { ... } block to move a game anywhere.
+        // ============================================================
+        const games = [
+            {
+                img: "/images/games/minecraft.png",
+                alt: "Minecraft",
+                title: "Minecraft 1.12",
+                desc: "online no download needed official version of 1.12",
+                link: "/games/minecraft/",
+                buttonText: "play"
+            },
+            {
+                img: "/images/games/subwaysurfers.webp",
+                alt: "Subway Surfers: Miami",
+                title: "Subway Surfers: Miami",
+                desc: "subway surfers miami edition",
+                link: "/games/subwaysurfers/",
+                buttonText: "play"
+            },
+            {
+                img: "/images/games/bloonstd5.jpg",
+                alt: "Bloons TD 5",
+                title: "Bloons TD 5",
+                desc: "ported flash version of btd5",
+                link: "/games/bloonstd5/",
+                buttonText: "play"
+            },
+            {
+                img: "/images/games/tinyfishing.webp",
+                alt: "Tiny Fishing",
+                title: "Tiny Fishing",
+                desc: "chill lil game about fishing",
+                link: "/games/tinyfishing/",
+                buttonText: "play"
+            },
+            {
+                img: "/images/games/polytrackthumbnail.webp",
+                alt: "PolyTrack",
+                title: "PolyTrack",
+                desc: "low poly racing game, a classic",
+                link: "/games/polytrack/",
+                buttonText: "play"
+            },
+            {
+                img: "/images/games/ovothumbnail.webp",
+                alt: "OvO",
+                title: "OvO",
+                desc: "fun lightweight platformer",
+                link: "/games/ovo/",
+                buttonText: "play"
+            },
+            {
+                img: "/images/games/rocketleaguethumbnail.png",
+                alt: "Rocket League",
+                title: "Rocket League",
+                desc: "car soccer game",
+                link: "/games/rocketleague/",
+                buttonText: "play"
+            },
+            {
+                img: "/images/games/gdlitethumbnail.png",
+                alt: "Geometry Dash Lite",
+                title: "Geometry Dash Lite",
+                desc: "a smaller version of geometry dash",
+                link: "/games/gdlite/",
+                buttonText: "play"
+            },
+            {
+                img: "/images/games/tungsahurhorrorthumbnail.png",
+                alt: "Tung Sahur Horror",
+                title: "Tung Sahur Horror",
+                desc: "retexture of the horror game granny",
+                link: "/games/tungsahurhorror/",
+                buttonText: "play"
+            },
+            {
+                img: "/images/games/treeshateyouthumbnail.jpg",
+                alt: "Trees Hate You",
+                title: "Trees Hate You",
+                desc: "a innocent seeming game, where trees try to kill you at every moment",
+                link: "/games/treeshateyou/",
+                buttonText: "play"
+            },
+            {
+                img: "/images/games/eugeneslifethumbnail.jpg",
+                alt: "Eugene's Life",
+                title: "Eugene's Life",
+                desc: "a squishy goofy ahh platformer game, great fun",
+                link: "/games/eugeneslife/",
+                buttonText: "play"
+            },
+            {
+                img: "/images/games/escaperoadcity2thumbnail.png",
+                alt: "Escape Road City 2",
+                title: "Escape Road City 2",
+                desc: "play as a criminal who just robbed a car. gain stars as you evade police",
+                link: "/games/escaperoadcity2/",
+                buttonText: "play"
+            },
+            {
+                img: "/images/games/fnafsisterlocationthumbnail.png",
+                alt: "FNAF: Sister Location",
+                title: "FNAF: Sister Location",
+                desc: "play as a technician in a horror circus (JUMPSCARE WARNING)",
+                link: "/games/fnafsisterlocation/",
+                buttonText: "CURRENTLY BROKEN"
+            },
+            {
+                img: "/images/games/bigflappytowertinysquarethumbnail.webp",
+                alt: "Big Flappy Tower Tiny Square",
+                title: "Big Flappy Tower Tiny Square",
+                desc: "an incredibly difficult platformer with a unique flapping mechanic",
+                link: "/games/bigflappytowertinysquare/",
+                buttonText: "play"
+            },
+            {
+                img: "/images/games/slicemaster.jpg",
+                alt: "Slice Master",
+                title: "Slice Master",
+                desc: "an amsr slicing game",
+                link: "/games/slicemaster/",
+                buttonText: "play"
+            },
+            {
+                img: "/images/games/brawlstars.jpg",
+                alt: "Brawl Stars",
+                title: "Brawl Stars",
+                desc: "brawl stars unity remake",
+                link: "/games/brawlstars/",
+                buttonText: "play"
+            }
+        ];
+
+        function escapeHtml(str) {
+            const div = document.createElement("div");
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function renderGames() {
+            const grid = document.getElementById("game-grid");
+            grid.innerHTML = games.map(game => `
+                <div class="card">
+                    <img src="${game.img}" alt="${escapeHtml(game.alt)}">
+                    <h2>${escapeHtml(game.title)}</h2>
+                    <p>${escapeHtml(game.desc)}</p>
+                    <a href="${game.link}" class="button">${escapeHtml(game.buttonText)}</a>
+                </div>
+            `).join("");
+        }
+
+        renderGames();
+    </script>
+
 </body>
 </html>
