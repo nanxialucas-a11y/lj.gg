@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>apps &amp; websites — lj.gg</title>
+    <link rel="icon" href="../favicon.ico?v=3">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600&family=Special+Elite&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/music-player.css">
+    <style>
+        :root {
+            --cream: #f2ecd6;
+            --card: #fbf7ea;
+            --ink: #2b2115;
+            --olive: #47542f;
+            --clay: #a68a5b;
+            --muted: #6b5d4a;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--cream);
+            color: var(--ink);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        a { color: inherit; }
+
+        :focus-visible {
+            outline: 2px solid var(--olive);
+            outline-offset: 3px;
+        }
+
+        nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 22px clamp(24px, 6vw, 64px);
+            border-bottom: 1px solid rgba(71, 84, 47, 0.18);
+        }
+
+        nav .back {
+            font-size: 13px;
+            color: var(--muted);
+            text-decoration: none;
+            transition: color 0.15s ease;
+        }
+
+        nav .back:hover { color: var(--olive); }
+
+        nav .wordmark {
+            font-family: 'Lora', serif;
+            font-weight: 600;
+            font-style: italic;
+            font-size: 18px;
+            color: var(--olive);
+        }
+
+        main {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: clamp(40px, 7vw, 72px) clamp(24px, 6vw, 64px) 80px;
+        }
+
+        .hero h1 {
+            font-family: 'Lora', serif;
+            font-weight: 600;
+            font-style: italic;
+            font-size: clamp(34px, 6vw, 46px);
+            color: var(--olive);
+            text-shadow: 0 0 18px rgba(71, 84, 47, 0.3);
+            letter-spacing: -0.01em;
+        }
+
+        .hero p {
+            margin-top: 12px;
+            font-size: 15.5px;
+            color: var(--muted);
+            max-width: 54ch;
+        }
+
+        .drawer-label {
+            margin-top: 36px;
+            font-family: 'Special Elite', monospace;
+            font-size: 11px;
+            letter-spacing: 0.06em;
+            color: var(--clay);
+            text-transform: uppercase;
+        }
+
+        .filters {
+            margin-top: 14px;
+            margin-bottom: 40px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .filter-chip {
+            font-family: 'Inter', sans-serif;
+            font-size: 12.5px;
+            padding: 6px 14px;
+            border-radius: 999px;
+            border: 1px solid rgba(71, 84, 47, 0.3);
+            background: transparent;
+            color: var(--muted);
+            cursor: pointer;
+            transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+        }
+
+        .filter-chip:hover {
+            border-color: var(--olive);
+            color: var(--olive);
+        }
+
+        .filter-chip.active {
+            background: var(--olive);
+            border-color: var(--olive);
+            color: var(--cream);
+        }
+
+        .catalog {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 26px 22px;
+        }
+
+        .index-card {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            text-decoration: none;
+            color: var(--ink);
+            background: var(--card);
+            border: 1px solid rgba(71, 84, 47, 0.22);
+            border-radius: 3px;
+            padding: 16px 18px 18px;
+            min-height: 168px;
+            box-shadow: 0 2px 0 rgba(71, 84, 47, 0.08), 0 1px 4px rgba(71, 84, 47, 0.1);
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+
+        /* faint ruled lines, like real index cards */
+        .index-card::before {
+            content: "";
+            position: absolute;
+            inset: 44px 14px 14px 14px;
+            background-image: repeating-linear-gradient(
+                to bottom,
+                transparent,
+                transparent 20px,
+                rgba(71, 84, 47, 0.08) 21px
+            );
+            pointer-events: none;
+        }
+
+        /* punch holes, top-left library-card detail */
+        .index-card::after {
+            content: "";
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--cream);
+            box-shadow: 0 0 0 1px rgba(71, 84, 47, 0.25) inset,
+                        188px 0 0 0 var(--cream),
+                        188px 0 0 1px rgba(71, 84, 47, 0.25);
+        }
+
+        .index-card:hover {
+            transform: translateY(-4px) rotate(-0.6deg);
+            box-shadow: 0 10px 22px rgba(71, 84, 47, 0.2);
+        }
+
+        .call-number {
+            position: relative;
+            z-index: 1;
+            font-family: 'Special Elite', monospace;
+            font-size: 10.5px;
+            color: var(--clay);
+            letter-spacing: 0.03em;
+            margin-bottom: 10px;
+            margin-left: 22px;
+        }
+
+        .card-head {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            gap: 9px;
+        }
+
+        .card-head img {
+            width: 18px;
+            height: 18px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+
+        .card-head h2 {
+            font-family: 'Lora', serif;
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .index-card p {
+            position: relative;
+            z-index: 1;
+            margin-top: 8px;
+            font-size: 13px;
+            color: var(--muted);
+            line-height: 1.5;
+            flex: 1;
+        }
+
+        .card-foot {
+            position: relative;
+            z-index: 1;
+            margin-top: 10px;
+            font-family: 'Special Elite', monospace;
+            font-size: 10px;
+            color: var(--clay);
+            opacity: 0.8;
+            word-break: break-all;
+        }
+
+        .placeholder-tag {
+            position: absolute;
+            top: 8px;
+            right: 10px;
+            font-size: 9px;
+            padding: 2px 7px;
+            border-radius: 999px;
+            background: rgba(166, 138, 91, 0.25);
+            color: var(--clay);
+            z-index: 2;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            * { transition: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <a href="/home.html" class="back">← back to hub</a>
+        <span class="wordmark">apps &amp; websites</span>
+    </nav>
+
+    <main>
+
+        <section class="hero">
+            <h1>the catalog</h1>
+            <p>a shelf of tools and sites I actually reach for day to day — filed by what they're for, not how shiny they are.</p>
+        </section>
+
+        <p class="drawer-label">drawer — browse by category</p>
+        <div class="filters" id="filters"></div>
+
+        <section class="catalog" id="catalog"></section>
+
+    </main>
+
+    <script>
+        // ============================================================
+        // THE CATALOG — this is the whole list. To add something new,
+        // copy one of the { ... } blocks below, paste it anywhere in
+        // this array, and fill in the four fields. That's it — no
+        // other file needs to change, and the page rebuilds itself.
+        //
+        // category can be ANY word you want (not just the examples
+        // below) — a new filter chip appears automatically the first
+        // time you use a new category name.
+        // ============================================================
+        const entries = [
+            {
+                title: "Example Tool One",
+                url: "https://example.com",
+                desc: "placeholder entry — replace with a real tool description.",
+                category: "utility"
+            },
+            {
+                title: "Example Tool Two",
+                url: "https://example.org",
+                desc: "placeholder entry — replace with a real tool description.",
+                category: "school"
+            },
+            {
+                title: "Example Tool Three",
+                url: "https://example.net",
+                desc: "placeholder entry — replace with a real tool description.",
+                category: "fun"
+            }
+        ];
+
+        function escapeHtml(str) {
+            const div = document.createElement("div");
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function faviconFor(url) {
+            try {
+                const domain = new URL(url).hostname;
+                return `https://www.google.com/s2/favicons?sz=64&domain=${domain}`;
+            } catch (e) {
+                return "";
+            }
+        }
+
+        function callNumber(index) {
+            // decorative fake dewey-style code, just for flavor
+            const base = 100 + index * 7;
+            return `${base}.${(index * 31 + 4) % 90} · APP`;
+        }
+
+        function shelfLocation(url) {
+            try {
+                return new URL(url).hostname.replace("www.", "");
+            } catch (e) {
+                return url;
+            }
+        }
+
+        const catalogEl = document.getElementById("catalog");
+        const filtersEl = document.getElementById("filters");
+        let activeCategory = "all";
+
+        function render() {
+            const categories = ["all", ...new Set(entries.map(e => e.category))];
+            filtersEl.innerHTML = categories.map(cat => `
+                <button class="filter-chip${cat === activeCategory ? " active" : ""}" data-cat="${cat}">${cat}</button>
+            `).join("");
+
+            filtersEl.querySelectorAll(".filter-chip").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    activeCategory = btn.dataset.cat;
+                    render();
+                });
+            });
+
+            const visible = activeCategory === "all"
+                ? entries
+                : entries.filter(e => e.category === activeCategory);
+
+            catalogEl.innerHTML = visible.map((entry, i) => `
+                <a class="index-card" href="${entry.url}" target="_blank" rel="noopener">
+                    <span class="placeholder-tag">demo</span>
+                    <p class="call-number">${callNumber(i)}</p>
+                    <div class="card-head">
+                        <img src="${faviconFor(entry.url)}" alt="" loading="lazy">
+                        <h2>${escapeHtml(entry.title)}</h2>
+                    </div>
+                    <p>${escapeHtml(entry.desc)}</p>
+                    <p class="card-foot">${shelfLocation(entry.url)}</p>
+                </a>
+            `).join("");
+        }
+
+        render();
+    </script>
+
+</body>
+</html>
