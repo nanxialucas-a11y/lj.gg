@@ -5,186 +5,295 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>lj.gg</title>
     <link rel="icon" href="favicon.ico?v=3">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/music-player.css">
     <style>
+        :root {
+            --cream: #f2ecd6;
+            --cream-deep: #e8dfc2;
+            --ink: #2b2115;
+            --olive: #47542f;
+            --olive-deep: #333d22;
+            --clay: #a68a5b;
+            --muted: #6b5d4a;
+        }
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
 
+        html {
+            scroll-behavior: smooth;
+        }
+
         body {
-            background: #f2ecd6;
-            color: #3a2f22;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: var(--cream);
+            color: var(--ink);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        a {
+            color: inherit;
+        }
+
+        :focus-visible {
+            outline: 2px solid var(--olive);
+            outline-offset: 3px;
         }
 
         nav {
-            padding: 20px 40px;
-            border-bottom: 1px solid rgba(71, 84, 47, 0.3);
-            background: rgba(71, 84, 47, 0.08);
-            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 22px clamp(24px, 6vw, 64px);
+            border-bottom: 1px solid rgba(71, 84, 47, 0.18);
         }
 
-        nav h2 {
-            color: #47542f;
-            font-size: 28px;
-            letter-spacing: 1px;
-            text-shadow: 0 0 10px rgba(71, 84, 47, 0.6);
+        nav .wordmark {
+            font-family: 'Lora', serif;
+            font-weight: 600;
+            font-style: italic;
+            font-size: 20px;
+            color: var(--olive);
+            text-shadow: 0 0 12px rgba(71, 84, 47, 0.35);
+        }
+
+        nav .quicklink {
+            font-size: 13px;
+            color: var(--muted);
+            text-decoration: none;
+            border: 1px solid rgba(71, 84, 47, 0.3);
+            padding: 7px 14px;
+            border-radius: 999px;
+            transition: color 0.15s ease, border-color 0.15s ease;
+        }
+
+        nav .quicklink:hover {
+            color: var(--olive);
+            border-color: var(--olive);
         }
 
         main {
-            max-width: 1500px;
-            margin: auto;
-            padding: 40px;
+            max-width: 720px;
+            margin: 0 auto;
+            padding: clamp(48px, 10vw, 96px) clamp(24px, 6vw, 64px) 40px;
         }
 
-        .hero {
-            text-align: center;
-            margin-bottom: 40px;
+        .hero p.eyebrow {
+            font-size: 14px;
+            color: var(--clay);
+            margin-bottom: 14px;
         }
 
         .hero h1 {
-            font-size: 56px;
-            color: #47542f;
-            text-shadow: 0 0 15px rgba(71, 84, 47, 0.6);
-            margin-bottom: 10px;
+            font-family: 'Lora', serif;
+            font-weight: 600;
+            font-style: italic;
+            font-size: clamp(40px, 7vw, 58px);
+            line-height: 1.05;
+            color: var(--olive);
+            text-shadow: 0 0 20px rgba(71, 84, 47, 0.3);
+            letter-spacing: -0.01em;
         }
 
-        .hero p {
-            color: #6b5d4a;
-            font-size: 18px;
+        .hero p.lede {
+            margin-top: 18px;
+            max-width: 46ch;
+            font-size: 17px;
+            line-height: 1.6;
+            color: var(--muted);
         }
 
-        .card {
-            background: rgba(71, 84, 47, 0.08);
-            border: 1px solid rgba(71, 84, 47, 0.3);
-            border-radius: 16px;
-            padding: 25px;
-            box-shadow: 0 0 25px rgba(71, 84, 47, 0.15);
-            transition: 0.2s;
+        .index {
+            margin-top: 64px;
         }
 
-        .card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 0 30px rgba(71, 84, 47, 0.25);
+        .index-heading {
+            font-size: 13px;
+            color: var(--clay);
+            margin-bottom: 4px;
         }
 
-        .card h2 {
-            color: #47542f;
-            margin-bottom: 10px;
-            text-shadow: 0 0 10px rgba(71, 84, 47, 0.6);
+        .entry {
+            display: block;
+            text-decoration: none;
+            padding: 22px 0;
+            border-bottom: 1px solid rgba(71, 84, 47, 0.16);
         }
 
-        .card p {
-            color: #6b5d4a;
+        .entry:first-of-type {
+            border-top: 1px solid rgba(71, 84, 47, 0.16);
+        }
+
+        .entry-row {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .entry-title-group {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .entry-title {
+            font-family: 'Lora', serif;
+            font-weight: 600;
+            font-size: 21px;
+            color: var(--ink);
+            position: relative;
+        }
+
+        .entry-title::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            bottom: -2px;
+            width: 0%;
+            height: 1px;
+            background: var(--olive);
+            transition: width 0.2s ease;
+        }
+
+        .entry:hover .entry-title::after {
+            width: 100%;
+        }
+
+        .entry:hover .entry-title {
+            color: var(--olive);
+        }
+
+        .tag {
+            font-size: 11px;
+            padding: 3px 9px;
+            border-radius: 999px;
+            white-space: nowrap;
+        }
+
+        .tag.live {
+            background: rgba(71, 84, 47, 0.12);
+            color: var(--olive);
+        }
+
+        .tag.alpha {
+            background: rgba(166, 138, 91, 0.2);
+            color: var(--clay);
+        }
+
+        .tag.soon {
+            background: rgba(107, 93, 74, 0.12);
+            color: var(--muted);
+        }
+
+        .arrow {
+            font-family: 'Lora', serif;
+            font-style: italic;
+            color: var(--olive);
+            opacity: 0;
+            transform: translateX(-6px);
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .entry:hover .arrow {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .entry-desc {
+            margin-top: 6px;
+            font-size: 14.5px;
+            color: var(--muted);
+            max-width: 52ch;
             line-height: 1.5;
         }
 
-        .featured {
-            margin-bottom: 40px;
-        }
-
-        .featured .card {
-            padding: 60px;
-            min-height: 150px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            font-size: 30px;
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-            gap: 35px;
-        }
-
-        .button {
-            display: inline-block;
-            margin-top: 15px;
-            padding: 10px 18px;
-            border: 1px solid #47542f;
-            border-radius: 8px;
-            color: #47542f;
-            text-decoration: none;
-            transition: 0.2s;
-        }
-
-        .button:hover {
-            background: #47542f;
-            color: #f2ecd6;
-            box-shadow: 0 0 15px #47542f;
-        }
-
         footer {
-            text-align: center;
-            padding: 30px;
-            margin-top: 50px;
-            border-top: 1px solid rgba(71, 84, 47, 0.2);
-            color: #8a7a63;
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 30px clamp(24px, 6vw, 64px) 50px;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                transition: none !important;
+                scroll-behavior: auto !important;
+            }
         }
     </style>
 </head>
 <body>
 
     <nav>
-        <h2>welcome~</h2>
+        <span class="wordmark">lj.gg</span>
+        <a href="https://ljproxy.lucas.nanpro.com.au/" class="quicklink">open ljproxy →</a>
     </nav>
 
     <main>
 
         <section class="hero">
-            <h1>lj.gg</h1>
-            <p>the center of everything</p>
+            <p class="eyebrow">welcome~</p>
+            <h1>a small personal<br>corner of the internet.</h1>
+            <p class="lede">games, tools, and whatever else I've built for myself — made for shits and giggles, shared because why not.</p>
         </section>
 
-        <section class="featured">
-            <div class="card">
-                <p>
-                    a simple website created by me for shits and giggles
-                </p>
-            </div>
-        </section>
+        <section class="index">
+            <p class="index-heading">everything here</p>
 
-        <section class="grid">
+            <a href="games/" class="entry">
+                <div class="entry-row">
+                    <div class="entry-title-group">
+                        <span class="entry-title">unblocked games</span>
+                        <span class="tag live">live</span>
+                    </div>
+                    <span class="arrow">→</span>
+                </div>
+                <p class="entry-desc">a growing library of free, ad-free browser games. new ones added whenever I find something worth playing.</p>
+            </a>
 
-            <div class="card">
-                <h2>unblocked games</h2>
-                <p>
-                    lots free, unblocked games, cracked by me
-                </p>
+            <a href="https://ljproxy.lucas.nanpro.com.au/" class="entry">
+                <div class="entry-row">
+                    <div class="entry-title-group">
+                        <span class="entry-title">ljproxy v2</span>
+                        <span class="tag alpha">alpha</span>
+                    </div>
+                    <span class="arrow">→</span>
+                </div>
+                <p class="entry-desc">a lightweight browsing proxy I built from scratch. handles most sites fine — heavy JS apps like TikTok still break.</p>
+            </a>
 
-                <a href="games/" class="button">open</a>
-            </div>
+            <a href="apps-websites/" class="entry">
+                <div class="entry-row">
+                    <div class="entry-title-group">
+                        <span class="entry-title">apps &amp; websites</span>
+                        <span class="tag soon">soon</span>
+                    </div>
+                    <span class="arrow">→</span>
+                </div>
+                <p class="entry-desc">a shortlist of tools and sites I actually use day to day. still putting this together.</p>
+            </a>
 
-            <div class="card">
-                <h2>useful apps and websites (TBA)</h2>
-                <p>
-                    some apps i use a LOT
-                </p>
-
-                <a href="apps-websites/" class="button">TO BE ADDED</a>
-            </div>
-
-            <div class="card">
-                <h2>anime (TBA)</h2>
-                <p>
-                    watch your favorite anime here for free with zero ads
-                </p>
-
-                <a href="anime/" class="button">DEPRECATED</a>
-            </div>
-
-            <div class="card">
-                <h2>ljproxy</h2>
-                <p>
-                    ultraviolet based proxy (HIGHLY UNSTABLE)
-                </p>
-
-                <a href="https://ljproxy.lucas.nanpro.com.au/" class="button">BROKEN</a>
-            </div>
+            <a href="anime/" class="entry">
+                <div class="entry-row">
+                    <div class="entry-title-group">
+                        <span class="entry-title">anime</span>
+                        <span class="tag soon">on hold</span>
+                    </div>
+                    <span class="arrow">→</span>
+                </div>
+                <p class="entry-desc">was planning a free watch section here. parked for now.</p>
+            </a>
 
         </section>
 
@@ -193,6 +302,5 @@
     <footer>
         © 2026 Lucas Jiang.
     </footer>
-    <script src="/music-player.js"></script>
 </body>
 </html>

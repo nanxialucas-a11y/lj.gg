@@ -3,10 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>games</title>
+    <title>games — lj.gg</title>
     <link rel="icon" href="../favicon.ico?v=3">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/music-player.css">
     <style>
+        :root {
+            --cream: #f2ecd6;
+            --ink: #2b2115;
+            --olive: #47542f;
+            --olive-deep: #333d22;
+            --clay: #a68a5b;
+            --muted: #6b5d4a;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -14,126 +26,241 @@
         }
 
         body {
-            background: #f2ecd6;
-            color: #3a2f22;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: var(--cream);
+            color: var(--ink);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        a { color: inherit; }
+
+        :focus-visible {
+            outline: 2px solid var(--olive);
+            outline-offset: 3px;
         }
 
         nav {
-            padding: 20px 40px;
-            border-bottom: 1px solid rgba(71, 84, 47, 0.3);
-            background: rgba(71, 84, 47, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 22px clamp(24px, 6vw, 64px);
+            border-bottom: 1px solid rgba(71, 84, 47, 0.18);
         }
 
-        nav h2 {
-            color: #47542f;
-            text-shadow: 0 0 10px rgba(71, 84, 47, 0.6);
+        nav .back {
+            font-size: 13px;
+            color: var(--muted);
+            text-decoration: none;
+            transition: color 0.15s ease;
+        }
+
+        nav .back:hover {
+            color: var(--olive);
+        }
+
+        nav .wordmark {
+            font-family: 'Lora', serif;
+            font-weight: 600;
+            font-style: italic;
+            font-size: 18px;
+            color: var(--olive);
         }
 
         main {
-            max-width: 1500px;
-            margin: auto;
-            padding: 40px;
-        }
-
-        .hero {
-            text-align: center;
-            margin-bottom: 40px;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: clamp(40px, 7vw, 72px) clamp(24px, 6vw, 64px) 80px;
         }
 
         .hero h1 {
-            font-size: 56px;
-            color: #47542f;
-            text-shadow: 0 0 15px rgba(71, 84, 47, 0.6);
+            font-family: 'Lora', serif;
+            font-weight: 600;
+            font-style: italic;
+            font-size: clamp(36px, 6vw, 50px);
+            color: var(--olive);
+            text-shadow: 0 0 18px rgba(71, 84, 47, 0.3);
+            letter-spacing: -0.01em;
         }
 
         .hero p {
-            color: #6b5d4a;
-            margin-top: 10px;
+            margin-top: 12px;
+            font-size: 16px;
+            color: var(--muted);
+            max-width: 50ch;
         }
 
-        .back {
-            margin-bottom: 40px;
-            display: inline-block;
+        .toolbar {
+            margin-top: 40px;
+            margin-bottom: 36px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .search {
+            flex: 1;
+            max-width: 360px;
+            position: relative;
+        }
+
+        .search input {
+            width: 100%;
+            padding: 11px 16px 11px 38px;
+            border-radius: 10px;
+            border: 1px solid rgba(71, 84, 47, 0.3);
+            background: rgba(255, 255, 255, 0.5);
+            color: var(--ink);
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+        }
+
+        .search input::placeholder {
+            color: var(--muted);
+        }
+
+        .search svg {
+            position: absolute;
+            left: 13px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 15px;
+            height: 15px;
+            stroke: var(--muted);
+        }
+
+        .count {
+            font-size: 13px;
+            color: var(--muted);
         }
 
         .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 35px;
+            grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+            gap: 22px;
         }
 
         .card {
-            background: rgba(71, 84, 47, 0.08);
-            border: 1px solid rgba(71, 84, 47, 0.3);
-            border-radius: 16px;
-            padding: 25px;
-            box-shadow: 0 0 25px rgba(71, 84, 47, 0.15);
-            transition: 0.2s;
-
             display: flex;
             flex-direction: column;
+            text-decoration: none;
+            border-radius: 14px;
+            overflow: hidden;
+            background: rgba(71, 84, 47, 0.05);
+            border: 1px solid rgba(71, 84, 47, 0.16);
+            transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
         }
 
         .card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 0 30px rgba(71, 84, 47, 0.25);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 28px rgba(71, 84, 47, 0.18);
+            border-color: rgba(71, 84, 47, 0.35);
         }
 
-        .card img {
+        .card .thumb {
+            position: relative;
             width: 100%;
             aspect-ratio: 1 / 1;
+            overflow: hidden;
+        }
+
+        .card .thumb img {
+            width: 100%;
+            height: 100%;
             object-fit: cover;
-            border-radius: 12px;
-            margin-bottom: 15px;
-            border: 1px solid rgba(71, 84, 47, 0.2);
+            display: block;
+        }
+
+        .card .badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 10.5px;
+            padding: 3px 9px;
+            border-radius: 999px;
+            background: rgba(43, 33, 21, 0.75);
+            color: #f2ecd6;
+            backdrop-filter: blur(4px);
+        }
+
+        .card .badge.down {
+            background: rgba(160, 60, 45, 0.85);
+        }
+
+        .card-body {
+            padding: 14px 16px 16px;
+            display: flex;
+            flex-direction: column;
+            flex: 1;
         }
 
         .card h2 {
-            color: #47542f;
-            margin-bottom: 10px;
-            text-shadow: 0 0 10px rgba(71, 84, 47, 0.6);
+            font-family: 'Lora', serif;
+            font-weight: 600;
+            font-size: 16px;
+            color: var(--ink);
+            margin-bottom: 4px;
         }
 
         .card p {
-            color: #6b5d4a;
-            line-height: 1.5;
-            margin-bottom: 15px;
+            font-size: 13px;
+            color: var(--muted);
+            line-height: 1.45;
+            flex: 1;
         }
 
-        .button {
-            display: inline-block;
-            margin-top: auto;
-            padding: 10px 18px;
-            border: 1px solid #47542f;
-            border-radius: 8px;
-            color: #47542f;
-            text-decoration: none;
-            transition: 0.2s;
+        .card .play {
+            margin-top: 12px;
+            font-size: 13px;
+            color: var(--olive);
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
         }
 
-        .button:hover {
-            background: #47542f;
-            color: #f2ecd6;
-            box-shadow: 0 0 15px #47542f;
+        .card .play .arrow {
+            transition: transform 0.15s ease;
+        }
+
+        .card:hover .play .arrow {
+            transform: translateX(3px);
+        }
+
+        .no-results {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            * { transition: none !important; }
         }
     </style>
 </head>
 <body>
 
     <nav>
-        <h2>games</h2>
+        <a href="/home.html" class="back">← back to hub</a>
+        <span class="wordmark">games</span>
     </nav>
 
     <main>
 
-        <a href="/home.html" class="button back">← back to hub</a>
-
         <section class="hero">
             <h1>games</h1>
-            <p>free, unblocked, ad-free games that can be played anywhere</p>
+            <p>free, unblocked, ad-free games that can be played anywhere.</p>
         </section>
+
+        <div class="toolbar">
+            <div class="search">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" id="search-input" placeholder="search games..." autocomplete="off">
+            </div>
+            <span class="count" id="count-label"></span>
+        </div>
 
         <section class="grid" id="game-grid"></section>
 
@@ -145,6 +272,7 @@
         // To reorder the cards on the page, just move entries around
         // in this array — top of the array = top-left of the grid.
         // Copy/paste a whole { ... } block to move a game anywhere.
+        // Add status: "down" to a game to show a red "down" badge.
         // ============================================================
         const games = [
             {
@@ -152,104 +280,91 @@
                 alt: "Minecraft",
                 title: "Minecraft 1.12",
                 desc: "online no download needed official version of 1.12",
-                link: "/games/minecraft/",
-                buttonText: "play"
+                link: "/games/minecraft/"
             },
             {
                 img: "/images/games/subwaysurfers.webp",
                 alt: "Subway Surfers: Miami",
                 title: "Subway Surfers: Miami",
                 desc: "subway surfers miami edition",
-                link: "/games/subwaysurfers/",
-                buttonText: "play"
+                link: "/games/subwaysurfers/"
             },
             {
                 img: "/images/games/bloonstd5.jpg",
                 alt: "Bloons TD 5",
                 title: "Bloons TD 5",
                 desc: "ported flash version of btd5",
-                link: "/games/bloonstd5/",
-                buttonText: "play"
+                link: "/games/bloonstd5/"
             },
             {
                 img: "/images/games/tinyfishing.webp",
                 alt: "Tiny Fishing",
                 title: "Tiny Fishing",
                 desc: "chill lil game about fishing",
-                link: "/games/tinyfishing/",
-                buttonText: "play"
+                link: "/games/tinyfishing/"
             },
             {
                 img: "/images/games/polytrackthumbnail.webp",
                 alt: "PolyTrack",
                 title: "PolyTrack",
                 desc: "low poly racing game, a classic",
-                link: "/games/polytrack/",
-                buttonText: "play"
+                link: "/games/polytrack/"
             },
             {
                 img: "/images/games/ovothumbnail.webp",
                 alt: "OvO",
                 title: "OvO",
                 desc: "fun lightweight platformer",
-                link: "/games/ovo/",
-                buttonText: "play"
+                link: "/games/ovo/"
             },
             {
                 img: "/images/games/rocketleaguethumbnail.png",
                 alt: "Rocket League",
                 title: "Rocket League",
                 desc: "car soccer game",
-                link: "/games/rocketleague/",
-                buttonText: "play"
+                link: "/games/rocketleague/"
             },
             {
                 img: "/images/games/gdlitethumbnail.png",
                 alt: "Geometry Dash Lite",
                 title: "Geometry Dash Lite",
                 desc: "a smaller version of geometry dash",
-                link: "/games/gdlite/",
-                buttonText: "play"
+                link: "/games/gdlite/"
             },
             {
                 img: "/images/games/tungsahurhorrorthumbnail.png",
                 alt: "Tung Sahur Horror",
                 title: "Tung Sahur Horror",
                 desc: "retexture of the horror game granny",
-                link: "/games/tungsahurhorror/",
-                buttonText: "play"
+                link: "/games/tungsahurhorror/"
             },
             {
                 img: "/images/games/treeshateyouthumbnail.jpg",
                 alt: "Trees Hate You",
                 title: "Trees Hate You",
                 desc: "a innocent seeming game, where trees try to kill you at every moment",
-                link: "/games/treeshateyou/",
-                buttonText: "play"
+                link: "/games/treeshateyou/"
             },
             {
                 img: "/images/games/pvz.jpeg",
                 alt: "PVZ",
                 title: "Plants vs Zombies",
                 desc: "tower defense game where you shoot zombos with peas",
-                link: "/games/pvz/",
-                buttonText: "play"
+                link: "/games/pvz/"
             },
-	    {
+            {
                 img: "/images/games/eugeneslifethumbnail.jpg",
                 alt: "Eugene's Life",
                 title: "Eugene's Life",
                 desc: "a squishy goofy ahh platformer game, great fun",
-                link: "/games/eugeneslife/",
-                buttonText: "play"
+                link: "/games/eugeneslife/"
             },
             {
                 img: "/images/games/escaperoadcity2thumbnail.png",
                 alt: "Escape Road City 2",
                 title: "Escape Road City 2",
                 desc: "play as a criminal who just robbed a car. gain stars as you evade police",
-                link: "/games/escaperoadcity2/",
-                buttonText: "play"
+                link: "/games/escaperoadcity2/"
             },
             {
                 img: "/images/games/fnafsisterlocationthumbnail.png",
@@ -257,31 +372,28 @@
                 title: "FNAF: Sister Location",
                 desc: "play as a technician in a horror circus (JUMPSCARE WARNING)",
                 link: "/games/fnafsisterlocation/",
-                buttonText: "CURRENTLY BROKEN"
+                status: "down"
             },
             {
                 img: "/images/games/bigflappytowertinysquarethumbnail.webp",
                 alt: "Big Flappy Tower Tiny Square",
                 title: "Big Flappy Tower Tiny Square",
                 desc: "an incredibly difficult platformer with a unique flapping mechanic",
-                link: "/games/bigflappytowertinysquare/",
-                buttonText: "play"
+                link: "/games/bigflappytowertinysquare/"
             },
             {
                 img: "/images/games/slicemaster.jpg",
                 alt: "Slice Master",
                 title: "Slice Master",
                 desc: "an amsr slicing game",
-                link: "/games/slicemaster/",
-                buttonText: "play"
+                link: "/games/slicemaster/"
             },
             {
                 img: "/images/games/brawlstars.jpg",
                 alt: "Brawl Stars",
                 title: "Brawl Stars",
                 desc: "brawl stars unity remake",
-                link: "/games/brawlstars/",
-                buttonText: "play"
+                link: "/games/brawlstars/"
             }
         ];
 
@@ -291,19 +403,44 @@
             return div.innerHTML;
         }
 
-        function renderGames() {
-            const grid = document.getElementById("game-grid");
-            grid.innerHTML = games.map(game => `
-                <div class="card">
-                    <img src="${game.img}" alt="${escapeHtml(game.alt)}">
-                    <h2>${escapeHtml(game.title)}</h2>
-                    <p>${escapeHtml(game.desc)}</p>
-                    <a href="${game.link}" class="button">${escapeHtml(game.buttonText)}</a>
-                </div>
-            `).join("");
+        const grid = document.getElementById("game-grid");
+        const countLabel = document.getElementById("count-label");
+        const searchInput = document.getElementById("search-input");
+
+        function renderGames(list) {
+            if (list.length === 0) {
+                grid.innerHTML = `<p class="no-results">no games match that search.</p>`;
+            } else {
+                grid.innerHTML = list.map(game => `
+                    <a href="${game.link}" class="card">
+                        <div class="thumb">
+                            <img src="${game.img}" alt="${escapeHtml(game.alt)}" loading="lazy">
+                            ${game.status === "down" ? '<span class="badge down">down</span>' : ""}
+                        </div>
+                        <div class="card-body">
+                            <h2>${escapeHtml(game.title)}</h2>
+                            <p>${escapeHtml(game.desc)}</p>
+                            <span class="play">${game.status === "down" ? "currently unavailable" : "play"} <span class="arrow">→</span></span>
+                        </div>
+                    </a>
+                `).join("");
+            }
+            countLabel.textContent = list.length + (list.length === 1 ? " game" : " games");
         }
 
-        renderGames();
+        function filterGames(query) {
+            const q = query.trim().toLowerCase();
+            if (!q) return games;
+            return games.filter(g =>
+                g.title.toLowerCase().includes(q) || g.desc.toLowerCase().includes(q)
+            );
+        }
+
+        searchInput.addEventListener("input", (e) => {
+            renderGames(filterGames(e.target.value));
+        });
+
+        renderGames(games);
     </script>
 
 </body>
