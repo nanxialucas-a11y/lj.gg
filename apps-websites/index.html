@@ -88,8 +88,48 @@
             max-width: 54ch;
         }
 
+        .switcher {
+            position: relative;
+            display: inline-flex;
+            margin-top: 32px;
+            padding: 4px;
+            border-radius: 999px;
+            background: rgba(71, 84, 47, 0.08);
+            border: 1px solid rgba(71, 84, 47, 0.25);
+        }
+
+        .switcher-indicator {
+            position: absolute;
+            top: 4px;
+            bottom: 4px;
+            left: 4px;
+            border-radius: 999px;
+            background: var(--olive);
+            box-shadow: 0 0 14px rgba(71, 84, 47, 0.4);
+            transition: transform 0.28s cubic-bezier(0.65, 0, 0.35, 1), width 0.28s cubic-bezier(0.65, 0, 0.35, 1);
+        }
+
+        .switcher-btn {
+            position: relative;
+            z-index: 1;
+            font-family: 'Inter', sans-serif;
+            font-size: 13.5px;
+            font-weight: 500;
+            padding: 8px 20px;
+            border: none;
+            background: transparent;
+            color: var(--muted);
+            cursor: pointer;
+            border-radius: 999px;
+            transition: color 0.2s ease;
+        }
+
+        .switcher-btn.active {
+            color: var(--cream);
+        }
+
         .drawer-label {
-            margin-top: 36px;
+            margin-top: 32px;
             font-family: 'Special Elite', monospace;
             font-size: 11px;
             letter-spacing: 0.06em;
@@ -103,6 +143,7 @@
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
+            min-height: 30px;
         }
 
         .filter-chip {
@@ -128,10 +169,35 @@
             color: var(--cream);
         }
 
+        .catalog-wrap {
+            overflow: hidden;
+        }
+
         .catalog {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
             gap: 26px 22px;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+
+        .catalog.sliding-out-left {
+            opacity: 0;
+            transform: translateX(-24px);
+        }
+
+        .catalog.sliding-out-right {
+            opacity: 0;
+            transform: translateX(24px);
+        }
+
+        .catalog.sliding-in-from-left {
+            opacity: 0;
+            transform: translateX(-24px);
+        }
+
+        .catalog.sliding-in-from-right {
+            opacity: 0;
+            transform: translateX(24px);
         }
 
         .index-card {
@@ -149,7 +215,6 @@
             transition: transform 0.18s ease, box-shadow 0.18s ease;
         }
 
-        /* faint ruled lines, like real index cards */
         .index-card::before {
             content: "";
             position: absolute;
@@ -163,7 +228,6 @@
             pointer-events: none;
         }
 
-        /* punch holes, top-left library-card detail */
         .index-card::after {
             content: "";
             position: absolute;
@@ -236,16 +300,12 @@
             word-break: break-all;
         }
 
-        .placeholder-tag {
-            position: absolute;
-            top: 8px;
-            right: 10px;
-            font-size: 9px;
-            padding: 2px 7px;
-            border-radius: 999px;
-            background: rgba(166, 138, 91, 0.25);
-            color: var(--clay);
-            z-index: 2;
+        .empty-state {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 50px 20px;
+            color: var(--muted);
+            font-size: 14px;
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -267,10 +327,18 @@
             <p>a shelf of tools and sites i use often or just something really cool i stumbled upon.</p>
         </section>
 
+        <div class="switcher" id="switcher">
+            <span class="switcher-indicator" id="switcher-indicator"></span>
+            <button class="switcher-btn" data-type="website">websites</button>
+            <button class="switcher-btn" data-type="app">apps</button>
+        </div>
+
         <p class="drawer-label">the drawer: browse by category</p>
         <div class="filters" id="filters"></div>
 
-        <section class="catalog" id="catalog"></section>
+        <div class="catalog-wrap">
+            <section class="catalog" id="catalog"></section>
+        </div>
 
     </main>
 
@@ -278,31 +346,64 @@
         // ============================================================
         // THE CATALOG — this is the whole list. To add something new,
         // copy one of the { ... } blocks below, paste it anywhere in
-        // this array, and fill in the four fields. That's it — no
-        // other file needs to change, and the page rebuilds itself.
+        // this array, and fill in the fields. That's it — no other
+        // file needs to change, and the page rebuilds itself.
         //
-        // category can be ANY word you want (not just the examples
-        // below) — a new filter chip appears automatically the first
-        // time you use a new category name.
+        // type must be exactly "website" or "app" — that's what the
+        // switcher at the top splits on.
+        //
+        // category can be ANY word you want — a new filter chip
+        // appears automatically the first time you use a new one.
         // ============================================================
         const entries = [
             {
                 title: "cobalt.tools",
                 url: "https://cobalt.tools/",
                 desc: "a high quality media downloader from link, put any link in and download media in 4k.",
-                category: "utility"
+                category: "utility",
+                type: "website"
             },
             {
                 title: "Greasy Fork",
                 url: "https://greasyfork.org/",
                 desc: "the biggest site for downloading userscripts, userscript manager such as Violentmonkey required.",
-                category: "utility"
+                category: "utility",
+                type: "website"
             },
             {
                 title: "Have I Been Pwned",
                 url: "https://haveibeenpwned.com/",
-                desc: "check if your email or personal info has been leaked in data breaches",
-                category: "utility"
+                desc: "check if your email or personal info has been leaked in data breaches.",
+                category: "security",
+                type: "website"
+            },
+            {
+                title: "Pointer Pointer",
+                url: "https://pointerpointer.com/",
+                desc: "a website that points at your pointer, self explanatory.",
+                category: "fun",
+                type: "website"
+            },
+            {
+                title: "Remove Bg",
+                url: "https://remove.bg/",
+                desc: "extremely helpful tool to remove background of images.",
+                category: "utility",
+                type: "website"
+            },
+	    {
+                title: "VirusTotal",
+                url: "https://www.virustotal.com/gui/home/upload/",
+                desc: "online url and file malware scanner.",
+                category: "security",
+                type: "website"
+            },
+            {
+                title: "CleanMyMac",
+                url: "https://drive.google.com/drive/folders/1hh2yFn7G8FKcaCo6Alc2y0NVNlkvSQUj?dmr=1&ec=wgc-drive-%5Bmodule%5D-goto/",
+                desc: "the best mac cleaner on the market and lifetime free",
+                category: "utility",
+                type: "app"
             }
         ];
 
@@ -322,9 +423,8 @@
         }
 
         function callNumber(index) {
-            // decorative fake dewey-style code, just for flavor
             const base = 100 + index * 7;
-            return `${base}.${(index * 31 + 4) % 90} · APP`;
+            return `${base}.${(index * 31 + 4) % 90} · ${activeType === "app" ? "APP" : "WEB"}`;
         }
 
         function shelfLocation(url) {
@@ -337,10 +437,31 @@
 
         const catalogEl = document.getElementById("catalog");
         const filtersEl = document.getElementById("filters");
+        const switcherEl = document.getElementById("switcher");
+        const indicatorEl = document.getElementById("switcher-indicator");
+        const switcherButtons = switcherEl.querySelectorAll(".switcher-btn");
+
+        let activeType = "website";
         let activeCategory = "all";
 
-        function render() {
-            const categories = ["all", ...new Set(entries.map(e => e.category))];
+        function moveIndicator(button) {
+            indicatorEl.style.width = button.offsetWidth + "px";
+            indicatorEl.style.transform = `translateX(${button.offsetLeft - 4}px)`;
+        }
+
+        function updateSwitcherUI(newType) {
+            switcherButtons.forEach(btn => {
+                const isActive = btn.dataset.type === newType;
+                btn.classList.toggle("active", isActive);
+                if (isActive) moveIndicator(btn);
+            });
+        }
+
+        function renderFilters() {
+            const inType = entries.filter(e => e.type === activeType);
+            const categories = ["all", ...new Set(inType.map(e => e.category))];
+            if (!categories.includes(activeCategory)) activeCategory = "all";
+
             filtersEl.innerHTML = categories.map(cat => `
                 <button class="filter-chip${cat === activeCategory ? " active" : ""}" data-cat="${cat}">${cat}</button>
             `).join("");
@@ -348,17 +469,25 @@
             filtersEl.querySelectorAll(".filter-chip").forEach(btn => {
                 btn.addEventListener("click", () => {
                     activeCategory = btn.dataset.cat;
-                    render();
+                    renderFilters();
+                    renderCatalog();
                 });
             });
+        }
 
+        function renderCatalog() {
+            const inType = entries.filter(e => e.type === activeType);
             const visible = activeCategory === "all"
-                ? entries
-                : entries.filter(e => e.category === activeCategory);
+                ? inType
+                : inType.filter(e => e.category === activeCategory);
+
+            if (visible.length === 0) {
+                catalogEl.innerHTML = `<p class="empty-state">nothing filed here yet.</p>`;
+                return;
+            }
 
             catalogEl.innerHTML = visible.map((entry, i) => `
                 <a class="index-card" href="${entry.url}" target="_blank" rel="noopener">
-                    <span class="placeholder-tag">demo</span>
                     <p class="call-number">${callNumber(i)}</p>
                     <div class="card-head">
                         <img src="${faviconFor(entry.url)}" alt="" loading="lazy">
@@ -370,7 +499,44 @@
             `).join("");
         }
 
-        render();
+        function switchType(newType) {
+            if (newType === activeType) return;
+            const goingRight = newType === "app";
+
+            updateSwitcherUI(newType);
+
+            catalogEl.classList.add(goingRight ? "sliding-out-left" : "sliding-out-right");
+
+            setTimeout(() => {
+                activeType = newType;
+                activeCategory = "all";
+                renderFilters();
+                renderCatalog();
+
+                catalogEl.classList.remove("sliding-out-left", "sliding-out-right");
+                catalogEl.classList.add(goingRight ? "sliding-in-from-right" : "sliding-in-from-left");
+
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        catalogEl.classList.remove("sliding-in-from-right", "sliding-in-from-left");
+                    });
+                });
+            }, 180);
+        }
+
+        switcherButtons.forEach(btn => {
+            btn.addEventListener("click", () => switchType(btn.dataset.type));
+        });
+
+        window.addEventListener("resize", () => {
+            const activeBtn = switcherEl.querySelector(".switcher-btn.active");
+            if (activeBtn) moveIndicator(activeBtn);
+        });
+
+        // initial paint
+        updateSwitcherUI(activeType);
+        renderFilters();
+        renderCatalog();
     </script>
 
 </body>
