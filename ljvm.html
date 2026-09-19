@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ljVM</title>
+    <title>ljVM — lj.gg</title>
     <link rel="icon" href="../favicon.ico?v=3">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -87,24 +87,61 @@
             border: none;
             display: block;
         }
+
+        .vm-status {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            color: var(--muted);
+        }
+
+        .vm-status.error {
+            color: #a03c2d;
+        }
     </style>
 </head>
 <body>
 
     <nav>
-        <a href="/home.html" class="back">← back to home</a>
+        <a href="/home.html" class="back">← back to hub</a>
         <span class="wordmark">ljVM</span>
     </nav>
 
     <div class="vm-wrap">
-        <div class="vm-frame">
-            <iframe
-                src="https://31hh43zq51bibxzattp2qasn1.hyperbeam.com/4f-SJi-BQ8atQ89Qpqzjvw?token=rmU_8le9LubFkRu_NuAC-D9g8RcV9ngC5iXRQsCV9KA"
-                allow="clipboard-read; clipboard-write; autoplay; camera; microphone"
-                allowfullscreen
-            ></iframe>
+        <div class="vm-frame" id="vm-frame">
+            <div class="vm-status" id="vm-status">spinning up a fresh session...</div>
         </div>
     </div>
+
+    <script>
+        // Points at your ljvm-launcher Cloudflare Worker — swap in its real
+        // URL once deployed (workers.dev URL or your bound custom domain).
+        const LAUNCHER_URL = "https://ljvmlauncher.nanxia-lucas.workers.dev/";
+
+        const frame = document.getElementById("vm-frame");
+        const status = document.getElementById("vm-status");
+
+        fetch(LAUNCHER_URL)
+            .then(res => {
+                if (!res.ok) throw new Error("launcher returned " + res.status);
+                return res.json();
+            })
+            .then(data => {
+                if (!data.embed_url) throw new Error("no embed_url in response");
+                const iframe = document.createElement("iframe");
+                iframe.src = data.embed_url;
+                iframe.allow = "clipboard-read; clipboard-write; autoplay; camera; microphone";
+                iframe.allowFullscreen = true;
+                frame.innerHTML = "";
+                frame.appendChild(iframe);
+            })
+            .catch(err => {
+                status.textContent = "couldn't start a session: " + err.message;
+                status.classList.add("error");
+            });
+    </script>
 
 </body>
 </html>
