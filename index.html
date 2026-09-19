@@ -35,6 +35,7 @@
             color: var(--ink);
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             -webkit-font-smoothing: antialiased;
+            overflow: hidden;
         }
 
         :focus-visible {
@@ -50,6 +51,7 @@
             background: rgba(71, 84, 47, 0.06);
             border: 1px solid rgba(71, 84, 47, 0.25);
             box-shadow: 0 0 30px rgba(71, 84, 47, 0.15);
+            transition: opacity 0.3s ease;
         }
 
         p.eyebrow {
@@ -96,6 +98,18 @@
             box-shadow: 0 0 18px var(--olive);
         }
 
+        .bloom {
+            position: fixed;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--olive);
+            transform: translate(-50%, -50%) scale(0);
+            pointer-events: none;
+            z-index: 9999;
+            transition: transform 0.65s cubic-bezier(0.65, 0, 0.35, 1);
+        }
+
         @media (prefers-reduced-motion: reduce) {
             * { transition: none !important; }
         }
@@ -103,11 +117,50 @@
 </head>
 
 <body>
-    <div class="card">
+    <div class="card" id="card">
         <p class="eyebrow">welcome to</p>
         <h1>lj.gg</h1>
-        <p class="lede">previously "the hub" lj.gg is a small website i built with a library of unblocked games, plus a self made browsing proxy and a few other things in progress.</p>
-        <button onclick="window.location.href='home.html'">enter →</button>
+        <p class="lede">previously "the hub" lj.gg is a small website i built with a library of unblocked games, a browser virtual machine and a few other things in progress.</p>
+        <button id="enter-btn">enter →</button>
     </div>
+
+    <div class="bloom" id="bloom"></div>
+
+    <script>
+        const btn = document.getElementById("enter-btn");
+        const card = document.getElementById("card");
+        const bloom = document.getElementById("bloom");
+        const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+        btn.addEventListener("click", (e) => {
+            if (reduceMotion) {
+                window.location.href = "home.html";
+                return;
+            }
+
+            const rect = btn.getBoundingClientRect();
+            const x = rect.left + rect.width / 2;
+            const y = rect.top + rect.height / 2;
+
+            // scale big enough to cover the furthest corner of the viewport
+            const maxDist = Math.hypot(
+                Math.max(x, window.innerWidth - x),
+                Math.max(y, window.innerHeight - y)
+            );
+            const scale = (maxDist * 2.2) / 40;
+
+            bloom.style.left = x + "px";
+            bloom.style.top = y + "px";
+            card.style.opacity = "0";
+
+            requestAnimationFrame(() => {
+                bloom.style.transform = `translate(-50%, -50%) scale(${scale})`;
+            });
+
+            setTimeout(() => {
+                window.location.href = "home.html";
+            }, 600);
+        });
+    </script>
 </body>
 </html>

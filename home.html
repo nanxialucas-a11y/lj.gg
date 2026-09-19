@@ -236,13 +236,29 @@
                 scroll-behavior: auto !important;
             }
         }
+
+        .bloom-arrival {
+            position: fixed;
+            inset: 0;
+            background: var(--olive);
+            z-index: 9999;
+            pointer-events: none;
+            opacity: 1;
+            transition: opacity 0.45s ease;
+        }
+
+        .bloom-arrival.fade-out {
+            opacity: 0;
+        }
     </style>
 </head>
 <body>
 
+    <div class="bloom-arrival" id="bloom-arrival"></div>
+
     <nav>
         <span class="wordmark">lj.gg</span>
-        <a href="example.com" class="quicklink">click here to donate❤️ →</a>
+        <a href="https://example.com" class="quicklink">click here to donate❤️ →</a>
     </nav>
 
     <main>
@@ -318,6 +334,19 @@
     <footer style="text-align: center; padding: 20px 10px;">
     © 2026 Lucas Jiang. Contact me at nanxia.lucas@gmail.com. All Rights Reserved. No part of this website or its content may be reproduced, copied, modified, or adapted without the prior written consent of the author.
 </footer>
+
+<script>
+    const bloomArrival = document.getElementById("bloom-arrival");
+    if (bloomArrival) {
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                bloomArrival.classList.add("fade-out");
+            });
+        });
+        bloomArrival.addEventListener("transitionend", () => bloomArrival.remove());
+        setTimeout(() => bloomArrival.remove(), 700);
+    }
+</script>
 
 </body>
 </html>
