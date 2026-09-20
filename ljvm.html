@@ -97,14 +97,20 @@
     </nav>
 
     <div class="vm-wrap">
-        <div class="vm-frame">
-            <iframe
-                src="https://99bm9nm9jpuszfdowclwzn9gf.hyperbeam.com/--tbj5PhTReWoecjxO3cQg?token=SvSc5cMxY9-maXeS0g5X4oN1u-grcJFUB_522qPmy6A"
-                allow="clipboard-read; clipboard-write; autoplay; camera; microphone"
-                allowfullscreen
-            ></iframe>
-        </div>
+        <div class="vm-frame" id="vm-frame"></div>
     </div>
+
+    <script>
+
+        const EMBED_URL = "https://5e3drln9et7g5dz9zi8h2nkly.hyperbeam.com/UtrNwlotSga6g_MiGWR_iw?token=oLxIUFFYcKzmN7nazPcepljttIsWf0EKS8XXOJ_xCT0";
+
+        const frame = document.getElementById("vm-frame");
+        const iframe = document.createElement("iframe");
+        iframe.src = EMBED_URL;
+        iframe.allow = "clipboard-read; clipboard-write; autoplay; camera; microphone";
+        iframe.allowFullscreen = true;
+        frame.appendChild(iframe);
+    </script>
 
 </body>
 </html>
