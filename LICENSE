@@ -1,21 +1,73 @@
-MIT License
+PROPRIETARY SOFTWARE LICENSE AGREEMENT
 
-Copyright (c) 2026 nanxialucas-a11y
+Copyright (c) 2026 Lucas Jiang. All Rights Reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This repository, including its source code, design, documentation, text,
+images, and all associated content (collectively, the "Software"), is the
+proprietary and confidential property of Lucas Jiang ("the Owner"). This is
+not an open-source license. No rights are granted except as expressly stated
+below.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. GRANT OF RIGHTS
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+No license, right, or interest in the Software is granted to any person or
+entity by virtue of its being made publicly viewable. Public visibility of
+this repository (for example, on GitHub) does not constitute permission to
+use, copy, modify, or distribute the Software.
+
+2. OWNERSHIP
+
+The Software is and shall remain the exclusive property of the Owner. All
+title, ownership rights, and intellectual property rights in and to the
+Software, including all copies thereof, remain with the Owner.
+
+3. RESTRICTIONS
+
+Except as may be expressly authorized in advance in writing by the Owner, no
+person or entity may:
+
+    (a) copy, reproduce, or duplicate the Software, in whole or in part;
+    (b) modify, adapt, translate, or create derivative works based on the
+        Software;
+    (c) distribute, publish, sublicense, rent, lease, or otherwise make the
+        Software available to any third party;
+    (d) reverse engineer, decompile, or disassemble the Software; or
+    (e) use the Software, in whole or in part, for any commercial or
+        non-commercial purpose.
+
+4. DISCLAIMER OF WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS," WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. THE OWNER MAKES NO
+REPRESENTATION THAT THE SOFTWARE WILL BE ERROR-FREE OR UNINTERRUPTED.
+
+5. LIMITATION OF LIABILITY
+
+IN NO EVENT SHALL THE OWNER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
+LIABILITY ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+OR OTHER DEALINGS IN THE SOFTWARE.
+
+6. TERMINATION
+
+Any use of the Software not expressly authorized under this Agreement
+constitutes a violation of the Owner's rights and may result in legal action.
+Any implied access or permission is automatically terminated upon breach of
+these terms.
+
+7. GOVERNING LAW
+
+This Agreement shall be governed by and construed in accordance with the laws
+of the State of Victoria, Australia, without regard to its conflict of law
+principles.
+
+8. CONTACT
+
+For licensing inquiries or requests for permission, contact:
+nanxia.lucas@gmail.com
+
+---
+
+This Agreement constitutes the entire understanding regarding use of the
+Software and supersedes all prior agreements or understandings, whether
+written or oral, relating to its subject matter.
