@@ -830,6 +830,12 @@
         const PER_PAGE = 20;
         const SEARCH_BATCH_PAGES = 5;
 
+        // Throttle / retry / concurrency settings
+        const DELAY_BETWEEN_PAGES_MS = 300; // delay between page requests when scanning
+        const MAX_CONSECUTIVE_PAGE_ERRORS = 3; // abort scanning if this many pages fail in a row
+        const SEARCH_ALL_CONCURRENCY = 6; // concurrent workers when searching all pages
+        const AUTO_CONFIRM_LIMIT = 200; // pages threshold to confirm before "search all"
+
         const catalogView = document.getElementById("catalogView");
         const detailView = document.getElementById("detailView");
         const animeGrid = document.getElementById("animeGrid");
@@ -1052,25 +1058,42 @@
             };
         }
 
-        async function fetchJSON(url, { retries = 3, backoffBaseMs = 200 } = {}) {
+        // small helper
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // resilient fetch with retries + backoff (used everywhere)
+        async function fetchJSON(url, { retries = 4, backoffBaseMs = 300 } = {}) {
             for (let attempt = 0; attempt <= retries; attempt++) {
-                const response = await fetch(url, {
-                    method: "GET",
-                    headers: { "Accept": "application/json" }
-                });
+                try {
+                    const response = await fetch(url, {
+                        method: "GET",
+                        headers: { "Accept": "application/json" }
+                    });
 
-                if (response.ok) {
-                    return response.json();
+                    if (response.ok) {
+                        return response.json();
+                    }
+
+                    if (response.status >= 500 && response.status < 600 && attempt < retries) {
+                        const waitMs = backoffBaseMs * Math.pow(2, attempt);
+                        const jitter = Math.floor(Math.random() * Math.min(150, waitMs));
+                        await sleep(waitMs + jitter);
+                        continue;
+                    }
+
+                    throw new Error(`request failed (${response.status})`);
+                } catch (err) {
+                    // network-level errors: retry while attempts remain
+                    if (attempt < retries && (err instanceof TypeError || /network/i.test(err.message))) {
+                        const waitMs = backoffBaseMs * Math.pow(2, attempt);
+                        const jitter = Math.floor(Math.random() * Math.min(150, waitMs));
+                        await sleep(waitMs + jitter);
+                        continue;
+                    }
+                    throw err;
                 }
-
-                if (response.status >= 500 && response.status < 600 && attempt < retries) {
-                    const waitMs = backoffBaseMs * Math.pow(2, attempt);
-                    const jitter = Math.floor(Math.random() * Math.min(100, waitMs));
-                    await new Promise(r => setTimeout(r, waitMs + jitter));
-                    continue;
-                }
-
-                throw new Error(`request failed (${response.status})`);
             }
 
             throw new Error("request failed (max retries)");
@@ -1365,7 +1388,7 @@
                     });
             } else if (searchInProgress) {
                 status.textContent =
-                    `searching... checked ${searchScannedPage} of ${searchTotalPages} pages.`;
+                    `searching... checked ${searchScannedPage} of ${searchTotalPages} pages so far.`;
             } else if (searchScannedPage >= searchTotalPages) {
                 status.textContent =
                     `search complete · checked ${searchScannedPage} pages.`;
@@ -1376,14 +1399,26 @@
                         ${searchScannedPage === 0 ? "Search the catalogue to find more matches." : ""}
                     </p>
                     <br>
-                    <button class="action-button primary" id="searchMoreButton">
-                        search ${Math.min(SEARCH_BATCH_PAGES, searchTotalPages - searchScannedPage)} more pages →
-                    </button>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap">
+                        <button class="action-button primary" id="searchMoreButton">
+                            search ${Math.min(SEARCH_BATCH_PAGES, searchTotalPages - searchScannedPage)} more pages →
+                        </button>
+                        <button class="action-button" id="searchAllButton">search all pages →</button>
+                    </div>
                 `;
 
                 status.querySelector("#searchMoreButton")
                     ?.addEventListener("click", () => {
                         scanSearchPages(searchToken);
+                    });
+
+                status.querySelector("#searchAllButton")
+                    ?.addEventListener("click", () => {
+                        if (searchTotalPages > AUTO_CONFIRM_LIMIT) {
+                            const ok = window.confirm(`This will fetch ${searchTotalPages} pages in parallel (concurrency ${SEARCH_ALL_CONCURRENCY}). Continue?`);
+                            if (!ok) return;
+                        }
+                        fetchAllSearchPages(searchToken);
                     });
             }
 
@@ -1411,6 +1446,8 @@
 
             renderCatalog();
 
+            let consecutiveErrors = 0;
+
             try {
                 for (let page = startPage; page <= endPage; page++) {
                     if (token !== searchToken) return;
@@ -1418,13 +1455,22 @@
                     let pageData;
                     try {
                         pageData = await fetchCatalogPage(page);
+                        consecutiveErrors = 0;
                     } catch (error) {
                         if (token !== searchToken) return;
 
                         console.error(`search page ${page} error:`, error);
+                        consecutiveErrors += 1;
                         searchError = `page ${page} failed: ${error.message}`;
                         searchScannedPage = page;
                         renderCatalog();
+
+                        if (consecutiveErrors >= MAX_CONSECUTIVE_PAGE_ERRORS) {
+                            searchError = `search paused after ${consecutiveErrors} consecutive page failures. Try again later.`;
+                            break;
+                        }
+
+                        await sleep(DELAY_BETWEEN_PAGES_MS);
                         continue;
                     }
 
@@ -1459,6 +1505,8 @@
 
                     searchScannedPage = page;
                     renderCatalog();
+
+                    await sleep(DELAY_BETWEEN_PAGES_MS);
                 }
             } catch (error) {
                 if (token !== searchToken) return;
@@ -1471,6 +1519,129 @@
                     renderCatalog();
                 }
             }
+        }
+
+        // Parallel "search all pages" with concurrency control and progressive updates.
+        async function fetchAllSearchPages(token) {
+            if (searchInProgress || token !== searchToken) return;
+
+            const query = searchInput.value.trim().toLowerCase();
+            if (!query) { renderCatalog(); return; }
+
+            searchInProgress = true;
+            searchError = null;
+
+            // Ensure page 1 is fetched to know total pages and process its results
+            try {
+                const page1 = await fetchCatalogPage(1);
+                searchTotalPages = Math.max(1, page1.pagination.totalPages);
+
+                // process page1 results (de-dup checks applied)
+                for (const anime of page1.anime) {
+                    if (!matchesSearch(anime, query)) continue;
+                    const id = getAnimeId(anime);
+                    const key = id == null ? getTitle(anime).toLowerCase() : String(id);
+                    const alreadyAdded = searchResults.some(existing => {
+                        const existingId = getAnimeId(existing);
+                        const existingKey = existingId == null ? getTitle(existing).toLowerCase() : String(existingId);
+                        return existingKey === key;
+                    });
+                    if (!alreadyAdded) searchResults.push(anime);
+                }
+
+                searchScannedPage = 1;
+                renderCatalog();
+            } catch (err) {
+                console.error("initial page fetch failed:", err);
+                searchError = `page 1 failed: ${err.message}`;
+                searchInProgress = false;
+                renderCatalog();
+                return;
+            }
+
+            const total = searchTotalPages;
+            const pages = [];
+            for (let p = 2; p <= total; p++) {
+                pages.push(p);
+            }
+
+            let active = 0;
+            let idx = 0;
+            let consecutiveErrors = 0;
+
+            return new Promise(resolve => {
+                async function next() {
+                    if (token !== searchToken) {
+                        searchInProgress = false;
+                        renderCatalog();
+                        resolve();
+                        return;
+                    }
+
+                    if (idx >= pages.length && active === 0) {
+                        searchInProgress = false;
+                        renderCatalog();
+                        resolve();
+                        return;
+                    }
+
+                    while (active < SEARCH_ALL_CONCURRENCY && idx < pages.length) {
+                        const page = pages[idx++];
+                        active++;
+
+                        (async (p) => {
+                            try {
+                                const pageData = await fetchCatalogPage(p);
+
+                                if (token !== searchToken) { active--; return; }
+
+                                searchTotalPages = Math.max(searchTotalPages, pageData.pagination.totalPages);
+
+                                for (const anime of pageData.anime) {
+                                    if (!matchesSearch(anime, query)) continue;
+                                    const id = getAnimeId(anime);
+                                    const key = id == null ? getTitle(anime).toLowerCase() : String(id);
+
+                                    const alreadyAdded = searchResults.some(existing => {
+                                        const existingId = getAnimeId(existing);
+                                        const existingKey = existingId == null ? getTitle(existing).toLowerCase() : String(existingId);
+                                        return existingKey === key;
+                                    });
+
+                                    if (!alreadyAdded) searchResults.push(anime);
+                                }
+
+                                // increment scanned count (approximate progress)
+                                searchScannedPage = Math.min(total, searchScannedPage + 1);
+                                consecutiveErrors = 0;
+                                renderCatalog();
+                            } catch (error) {
+                                console.error(`search page ${p} error (all):`, error);
+                                searchError = `page ${p} failed: ${error.message}`;
+                                consecutiveErrors += 1;
+                                if (consecutiveErrors >= MAX_CONSECUTIVE_PAGE_ERRORS) {
+                                    searchError = `search paused after ${consecutiveErrors} consecutive page failures. Try again later.`;
+                                    // stop scheduling further pages
+                                    idx = pages.length;
+                                }
+                                renderCatalog();
+                            } finally {
+                                active--;
+                                await sleep(60);
+                                next();
+                            }
+                        })(page);
+                    }
+
+                    if (active === 0 && idx >= pages.length) {
+                        searchInProgress = false;
+                        renderCatalog();
+                        resolve();
+                    }
+                }
+
+                next();
+            });
         }
 
         function startSearch() {
@@ -1912,6 +2083,7 @@
             updateFilterUI();
         }
 
+        // initial load
         loadCatalog(1);
     </script>
 </body>
