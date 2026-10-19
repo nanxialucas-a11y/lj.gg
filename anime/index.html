@@ -77,6 +77,13 @@
             text-decoration: none;
         }
 
+        /* right-side controls container */
+        .nav-controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
         nav .quicklink {
             font-size: 13px;
             color: var(--muted);
@@ -85,11 +92,17 @@
             padding: 7px 14px;
             border-radius: 999px;
             transition: color 0.15s ease, border-color 0.15s ease;
+            background: transparent;
         }
 
         nav .quicklink:hover {
             color: var(--olive);
             border-color: var(--olive);
+        }
+
+        /* filter toggle uses quicklink styles for consistent look */
+        #filterToggle {
+            cursor: pointer;
         }
 
         main {
@@ -734,7 +747,19 @@
 
     <nav>
         <a href="/home.html" class="wordmark">lj.gg</a>
-        <a href="/home.html" class="quicklink">← back to home</a>
+        <div class="nav-controls">
+            <a href="/home.html" class="quicklink">← back to home</a>
+            <!-- Content filter toggle -->
+            <button
+                id="filterToggle"
+                class="quicklink"
+                type="button"
+                aria-pressed="true"
+                aria-label="Content filter is on. Toggle to show unfiltered content."
+            >
+                filter: on
+            </button>
+        </div>
     </nav>
 
     <main>
@@ -817,6 +842,7 @@
         const searchInput = document.getElementById("searchInput");
         const sortSelect = document.getElementById("sortSelect");
         const detailContent = document.getElementById("detailContent");
+        const filterToggle = document.getElementById("filterToggle");
 
         let currentPage = 1;
         let totalPages = 1;
@@ -838,6 +864,12 @@
 
         const searchPageCache = new Map();
         const bloomArrival = document.getElementById("bloom-arrival");
+
+        // New: content filter state (default: enabled to preserve current behavior)
+        let contentFilterEnabled = true;
+
+        // Track last opened series id so toggling can re-open it
+        let lastOpenedSeriesId = null;
 
         if (bloomArrival) {
             requestAnimationFrame(() => {
@@ -957,6 +989,9 @@
         }
 
         function isSuitable(anime) {
+            // If filter is disabled, everything is suitable
+            if (!contentFilterEnabled) return true;
+
             const blockedRatings = new Set([
                 "R+", "RX", "NC-17", "18+", "X"
             ]);
@@ -1035,21 +1070,24 @@
         }
 
         async function fetchCatalogPage(page) {
-            if (searchPageCache.has(page)) {
-                return searchPageCache.get(page);
+            // Cache must depend on filter state; easiest: cache key includes filter state
+            const cacheKey = `${page}|filter=${contentFilterEnabled ? "1" : "0"}`;
+            if (searchPageCache.has(cacheKey)) {
+                return searchPageCache.get(cacheKey);
             }
 
             const payload = await fetchJSON(
                 `${API_BASE}/recent-anime?page=${page}&per_page=${PER_PAGE}`
             );
 
+            const extracted = extractAnimeList(payload);
             const result = {
-                anime: extractAnimeList(payload).filter(isSuitable),
+                anime: extracted.filter(isSuitable),
                 pagination: getPagination(payload),
-                rawCount: extractAnimeList(payload).length
+                rawCount: extracted.length
             };
 
-            searchPageCache.set(page, result);
+            searchPageCache.set(cacheKey, result);
             return result;
         }
 
@@ -1076,7 +1114,9 @@
                 totalPages = Math.max(1, paginationData.totalPages);
                 currentAnime = rawList.filter(isSuitable);
 
-                searchPageCache.set(page, {
+                // Update cache for the page with current filter state
+                const cacheKey = `${page}|filter=${contentFilterEnabled ? "1" : "0"}`;
+                searchPageCache.set(cacheKey, {
                     anime: currentAnime,
                     pagination: paginationData,
                     rawCount: rawList.length
@@ -1464,6 +1504,9 @@
         async function openSeries(id) {
             const requestId = ++detailRequestId;
 
+            // remember the last opened series id so filter toggling can reopen it
+            lastOpenedSeriesId = id;
+
             catalogView.classList.add("hidden");
             detailView.classList.remove("hidden");
             detailContent.innerHTML = '<div class="status-panel">loading series details...</div>';
@@ -1821,6 +1864,50 @@
         document.getElementById("backToCatalog")
             .addEventListener("click", showCatalog);
 
+        // Filter toggle behavior
+        if (filterToggle) {
+            function updateFilterUI() {
+                filterToggle.setAttribute("aria-pressed", contentFilterEnabled ? "true" : "false");
+                filterToggle.textContent = `filter: ${contentFilterEnabled ? "on" : "off"}`;
+                filterToggle.title = contentFilterEnabled
+                    ? "Content filter is on. Click to show unfiltered content."
+                    : "Content filter is off. Click to enable filtering.";
+            }
+
+            filterToggle.addEventListener("click", () => {
+                // flip the filter state
+                contentFilterEnabled = !contentFilterEnabled;
+                updateFilterUI();
+
+                // Clear caches that depend on filter state
+                searchPageCache.clear();
+
+                // Cancel any active search
+                searchToken++;
+                searchResults = [];
+                searchScannedPage = 0;
+                searchTotalPages = totalPages;
+                searchInProgress = false;
+                searchError = null;
+
+                // Re-load current view respecting the new filter
+                if (!catalogView.classList.contains("hidden")) {
+                    // We are viewing the catalog
+                    loadCatalog(1);
+                } else if (lastOpenedSeriesId) {
+                    // We are viewing a detail page; try to reopen the same series
+                    openSeries(lastOpenedSeriesId);
+                } else {
+                    // fallback
+                    loadCatalog(1);
+                }
+            });
+
+            // initialize UI text
+            updateFilterUI();
+        }
+
+        // initial load
         loadCatalog(1);
     </script>
 </body>
