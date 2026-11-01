@@ -749,15 +749,13 @@
         <div class="nav-controls">
             <a href="/home.html" class="quicklink">← back to home</a>
 
-            <button
-                id="filterToggle"
+            <span
                 class="quicklink"
-                type="button"
-                aria-pressed="true"
-                aria-label="Content filter is on. Toggle to show unfiltered content."
+                title="The content filter stays on."
+                aria-label="Content filter is always on"
             >
                 filter: on
-            </button>
+            </span>
         </div>
     </nav>
 
@@ -826,15 +824,12 @@
     <script>
         "use strict";
 
-        const API_BASE = "https://ljanime.nanxia-lucas.workers.dev";
+        const ANILIST_API = "https://graphql.anilist.co";
+        const MEGAPLAY_BASE = "https://megaplay.buzz/stream/mal";
         const PER_PAGE = 20;
-        const SEARCH_BATCH_PAGES = 5;
-
-        // Throttle / retry / concurrency settings
-        const DELAY_BETWEEN_PAGES_MS = 300; // delay between page requests when scanning
-        const MAX_CONSECUTIVE_PAGE_ERRORS = 3; // abort scanning if this many pages fail in a row
-        const SEARCH_ALL_CONCURRENCY = 6; // concurrent workers when searching all pages
-        const AUTO_CONFIRM_LIMIT = 200; // pages threshold to confirm before "search all"
+        const REQUEST_RETRIES = 3;
+        const REQUEST_BACKOFF_MS = 700;
+        const SEARCH_DEBOUNCE_MS = 350;
 
         const catalogView = document.getElementById("catalogView");
         const detailView = document.getElementById("detailView");
@@ -847,40 +842,88 @@
         const searchInput = document.getElementById("searchInput");
         const sortSelect = document.getElementById("sortSelect");
         const detailContent = document.getElementById("detailContent");
-        const filterToggle = document.getElementById("filterToggle");
+        const bloomArrival = document.getElementById("bloom-arrival");
 
         let currentPage = 1;
-        let totalPages = 1;
+        let hasNextPage = false;
         let currentAnime = [];
         let selectedSeries = null;
         let selectedEpisode = null;
         let selectedLanguage = "sub";
-
         let searchTimer = null;
         let catalogRequestId = 0;
         let detailRequestId = 0;
-
-        let searchToken = 0;
-        let searchResults = [];
-        let searchScannedPage = 0;
-        let searchTotalPages = 1;
-        let searchInProgress = false;
-        let searchError = null;
-
-        const searchPageCache = new Map();
-        const bloomArrival = document.getElementById("bloom-arrival");
-
-        // content filter state (default: enabled to preserve current behavior)
-        let contentFilterEnabled = true;
         let lastOpenedSeriesId = null;
+        const mediaCache = new Map();
+
+        const MEDIA_FIELDS = `
+            id
+            idMal
+            title {
+                romaji
+                english
+                native
+                userPreferred
+            }
+            coverImage {
+                extraLarge
+                large
+                medium
+            }
+            description(asHtml: false)
+            episodes
+            genres
+            format
+            status
+            averageScore
+            startDate {
+                year
+            }
+            isAdult
+            tags {
+                name
+                isAdult
+                rank
+            }
+        `;
+
+        const SEARCH_QUERY = `
+            query AnimePage($page: Int!, $perPage: Int!, $search: String) {
+                Page(page: $page, perPage: $perPage) {
+                    pageInfo {
+                        currentPage
+                        hasNextPage
+                    }
+                    media(
+                        type: ANIME
+                        isAdult: false
+                        genre_not_in: ["Hentai", "Ecchi"]
+                        search: $search
+                        sort: [UPDATED_AT_DESC, POPULARITY_DESC]
+                    ) {
+                        ${MEDIA_FIELDS}
+                    }
+                }
+            }
+        `;
+
+        const DETAIL_QUERY = `
+            query AnimeDetail($id: Int!) {
+                Media(
+                    id: $id
+                    type: ANIME
+                    isAdult: false
+                    genre_not_in: ["Hentai", "Ecchi"]
+                ) {
+                    ${MEDIA_FIELDS}
+                }
+            }
+        `;
 
         if (bloomArrival) {
             requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    bloomArrival.classList.add("fade-out");
-                });
+                requestAnimationFrame(() => bloomArrival.classList.add("fade-out"));
             });
-
             bloomArrival.addEventListener("transitionend", () => bloomArrival.remove());
             setTimeout(() => bloomArrival.remove(), 700);
         }
@@ -904,272 +947,199 @@
         }
 
         function getTitle(anime) {
-            const raw = firstValue(
-                anime?.title,
-                anime?.name,
-                anime?.english_title,
-                anime?.englishTitle,
-                anime?.romaji,
-                anime?.japanese_title,
-                anime?.japaneseTitle,
+            return String(firstValue(
+                anime?.title?.english,
+                anime?.title?.userPreferred,
+                anime?.title?.romaji,
+                anime?.title?.native,
                 "untitled anime"
-            );
-
-            if (typeof raw === "object") {
-                return String(firstValue(
-                    raw?.english,
-                    raw?.romaji,
-                    raw?.userPreferred,
-                    raw?.native,
-                    raw?.name,
-                    "untitled anime"
-                ));
-            }
-
-            return String(raw);
+            ));
         }
 
         function getAnimeId(anime) {
-            return firstValue(
-                anime?.id,
-                anime?.series_id,
-                anime?.anime_id,
-                anime?.slug
-            );
+            return anime?.id == null ? "" : String(anime.id);
+        }
+
+        function getMalId(anime) {
+            const id = Number(anime?.idMal);
+            return Number.isSafeInteger(id) && id > 0 ? id : null;
         }
 
         function getPoster(anime) {
-            const poster = firstValue(
-                anime?.poster,
-                anime?.poster_url,
-                anime?.image,
-                anime?.image_url,
-                anime?.cover,
-                anime?.cover_image,
-                anime?.thumbnail,
-                anime?.thumbnail_url,
-                anime?.images?.jpg?.large_image_url,
-                anime?.images?.jpg?.image_url,
-                anime?.images?.webp?.large_image_url,
-                anime?.images?.webp?.image_url
-            );
-
-            if (typeof poster === "string") return poster;
-
-            if (poster && typeof poster === "object") {
-                return firstValue(poster.url, poster.large, poster.original) || "";
-            }
-
-            return "";
-        }
-
-        function getRating(anime) {
             return String(firstValue(
-                anime?.rating,
-                anime?.age_rating,
-                anime?.ageRating,
-                anime?.content_rating,
+                anime?.coverImage?.extraLarge,
+                anime?.coverImage?.large,
+                anime?.coverImage?.medium,
                 ""
-            )).trim().toUpperCase();
+            ));
         }
 
         function getGenres(anime) {
-            const raw = firstValue(
-                anime?.genres,
-                anime?.genre,
-                anime?.terms_by_type?.genre,
-                []
-            );
-
-            if (!Array.isArray(raw)) {
-                return raw ? [String(raw)] : [];
-            }
-
-            return raw.map(item => {
-                if (typeof item === "string") return item;
-                return String(firstValue(item?.name, item?.title, item?.label, ""));
-            }).filter(Boolean);
+            return Array.isArray(anime?.genres)
+                ? anime.genres.filter(genre => typeof genre === "string")
+                : [];
         }
 
         function isSuitable(anime) {
-            if (!contentFilterEnabled) return true;
-
-            const blockedRatings = new Set([
-                "R+", "RX", "NC-17", "18+", "X"
-            ]);
+            if (!anime || anime.isAdult === true) return false;
 
             const blockedGenres = new Set([
-                "hentai", "erotica", "ecchi", "adult"
+                "hentai", "ecchi", "erotica", "adult"
             ]);
 
-            if (blockedRatings.has(getRating(anime))) return false;
+            const genres = getGenres(anime).map(genre => genre.trim().toLowerCase());
+            if (genres.some(genre => blockedGenres.has(genre))) return false;
 
-            const genres = getGenres(anime).map(genre =>
-                genre.trim().toLowerCase()
+            const tags = Array.isArray(anime.tags) ? anime.tags : [];
+            if (tags.some(tag =>
+                tag?.isAdult === true ||
+                blockedGenres.has(String(tag?.name || "").trim().toLowerCase())
+            )) return false;
+
+            return true;
+        }
+
+        function getDescription(series) {
+            const description = String(
+                series?.description || "no description is available for this series yet."
             );
 
-            return !genres.some(genre => blockedGenres.has(genre));
+            // AniList descriptions may contain markup. Remove tags before displaying as text.
+            return description
+                .replace(/<[^>]*>/g, " ")
+                .replace(/\s+/g, " ")
+                .trim() || "no description is available for this series yet.";
         }
 
-        function extractAnimeList(payload) {
-            if (Array.isArray(payload)) return payload;
-
-            const possibleLists = [
-                payload?.results,
-                payload?.data,
-                payload?.anime,
-                payload?.items,
-                payload?.recent_anime,
-                payload?.recentAnime,
-                payload?.data?.results,
-                payload?.data?.anime,
-                payload?.data?.items
-            ];
-
-            for (const list of possibleLists) {
-                if (Array.isArray(list)) return list;
-            }
-
-            return [];
+        function getEpisodeCount(series) {
+            const count = Number(series?.episodes);
+            return Number.isInteger(count) && count > 0 ? Math.min(count, 500) : 0;
         }
 
-        function getPagination(payload) {
-            const paginationData =
-                payload?.pagination ||
-                payload?.data?.pagination ||
-                payload?.meta?.pagination ||
-                payload?.meta ||
-                {};
-
-            return {
-                totalPages: Number(firstValue(
-                    paginationData?.total_pages,
-                    paginationData?.last_page,
-                    paginationData?.totalPages,
-                    payload?.total_pages
-                )) || 1,
-
-                total: Number(firstValue(
-                    paginationData?.total,
-                    paginationData?.total_items,
-                    paginationData?.totalItems,
-                    payload?.total
-                )) || 0
-            };
+        function makeEpisodes(series) {
+            const count = getEpisodeCount(series);
+            return Array.from({ length: count }, (_, index) => ({
+                number: index + 1,
+                title: `episode ${index + 1}`
+            }));
         }
 
-        // small helper
         function sleep(ms) {
             return new Promise(resolve => setTimeout(resolve, ms));
         }
 
-        // resilient fetch with retries + backoff (used everywhere)
-        async function fetchJSON(url, { retries = 4, backoffBaseMs = 300 } = {}) {
+        async function fetchGraphQL(query, variables, { retries = REQUEST_RETRIES } = {}) {
+            let lastError;
+
             for (let attempt = 0; attempt <= retries; attempt++) {
                 try {
-                    const response = await fetch(url, {
-                        method: "GET",
-                        headers: { "Accept": "application/json" }
+                    const response = await fetch(ANILIST_API, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Accept": "application/json"
+                        },
+                        body: JSON.stringify({ query, variables })
                     });
 
                     if (response.ok) {
-                        return response.json();
+                        const payload = await response.json();
+                        if (Array.isArray(payload.errors) && payload.errors.length) {
+                            throw new Error(payload.errors.map(item => item.message).join("; "));
+                        }
+                        return payload.data;
                     }
 
-                    if (response.status >= 500 && response.status < 600 && attempt < retries) {
-                        const waitMs = backoffBaseMs * Math.pow(2, attempt);
-                        const jitter = Math.floor(Math.random() * Math.min(150, waitMs));
-                        await sleep(waitMs + jitter);
-                        continue;
+                    const retryable = response.status === 429 || response.status >= 500;
+                    if (!retryable || attempt === retries) {
+                        throw new Error(`AniList request failed (${response.status})`);
                     }
 
-                    throw new Error(`request failed (${response.status})`);
-                } catch (err) {
-                    // network-level errors: retry while attempts remain
-                    if (attempt < retries && (err instanceof TypeError || /network/i.test(err.message))) {
-                        const waitMs = backoffBaseMs * Math.pow(2, attempt);
-                        const jitter = Math.floor(Math.random() * Math.min(150, waitMs));
-                        await sleep(waitMs + jitter);
-                        continue;
-                    }
-                    throw err;
+                    const retryAfter = Number(response.headers.get("Retry-After"));
+                    const waitMs = retryAfter > 0
+                        ? Math.min(retryAfter * 1000, 10000)
+                        : REQUEST_BACKOFF_MS * Math.pow(2, attempt);
+
+                    await sleep(waitMs);
+                } catch (error) {
+                    lastError = error;
+
+                    const retryable =
+                        error instanceof TypeError ||
+                        /temporarily|network|failed to fetch/i.test(error?.message || "");
+
+                    if (!retryable || attempt === retries) throw error;
+
+                    await sleep(REQUEST_BACKOFF_MS * Math.pow(2, attempt));
                 }
             }
 
-            throw new Error("request failed (max retries)");
+            throw lastError || new Error("AniList request failed.");
         }
 
-        async function fetchCatalogPage(page) {
-            const cacheKey = `${page}|filter=${contentFilterEnabled ? "1" : "0"}`;
-            if (searchPageCache.has(cacheKey)) {
-                return searchPageCache.get(cacheKey);
+        function getSortedAnime(list) {
+            const sorted = [...list];
+            const sort = sortSelect.value;
+
+            if (sort === "title-asc") {
+                sorted.sort((a, b) => getTitle(a).localeCompare(getTitle(b)));
+            } else if (sort === "title-desc") {
+                sorted.sort((a, b) => getTitle(b).localeCompare(getTitle(a)));
             }
 
-            const payload = await fetchJSON(
-                `${API_BASE}/recent-anime?page=${page}&per_page=${PER_PAGE}`
-            );
-
-            const extracted = extractAnimeList(payload);
-            const result = {
-                anime: extracted.filter(isSuitable),
-                pagination: getPagination(payload),
-                rawCount: extracted.length
-            };
-
-            searchPageCache.set(cacheKey, result);
-            return result;
+            return sorted;
         }
 
         async function loadCatalog(page = 1) {
             const requestId = ++catalogRequestId;
+            const query = searchInput.value.trim();
 
-            currentPage = page;
+            currentPage = Math.max(1, page);
             animeGrid.innerHTML = '<div class="status-panel">loading anime...</div>';
             resultCount.textContent = "loading...";
-            pageNumber.textContent = `page ${page}`;
-            prevButton.disabled = page <= 1;
+            pageNumber.textContent = `page ${currentPage}`;
+            prevButton.disabled = currentPage <= 1;
             nextButton.disabled = true;
+            pagination.classList.remove("hidden");
 
             try {
-                const payload = await fetchJSON(
-                    `${API_BASE}/recent-anime?page=${page}&per_page=${PER_PAGE}`
-                );
+                const data = await fetchGraphQL(SEARCH_QUERY, {
+                    page: currentPage,
+                    perPage: PER_PAGE,
+                    search: query || null
+                });
 
                 if (requestId !== catalogRequestId) return;
 
-                const paginationData = getPagination(payload);
-                const rawList = extractAnimeList(payload);
+                const pageData = data?.Page;
+                if (!pageData || !Array.isArray(pageData.media)) {
+                    throw new Error("AniList returned an unexpected catalogue response.");
+                }
 
-                totalPages = Math.max(1, paginationData.totalPages);
-                currentAnime = rawList.filter(isSuitable);
+                currentAnime = pageData.media.filter(isSuitable);
+                hasNextPage = Boolean(pageData.pageInfo?.hasNextPage);
 
-                const cacheKey = `${page}|filter=${contentFilterEnabled ? "1" : "0"}`;
-                searchPageCache.set(cacheKey, {
-                    anime: currentAnime,
-                    pagination: paginationData,
-                    rawCount: rawList.length
+                currentAnime.forEach(anime => {
+                    mediaCache.set(String(anime.id), anime);
                 });
 
                 renderCatalog();
 
-                if (!searchInput.value.trim()) {
-                    const totalLabel = paginationData.total
-                        ? ` · ${paginationData.total.toLocaleString()} listed`
-                        : "";
+                const countText = `${currentAnime.length} title${currentAnime.length === 1 ? "" : "s"} shown`;
+                resultCount.textContent = query
+                    ? `${countText} for “${query}”`
+                    : countText;
 
-                    resultCount.textContent =
-                        `${currentAnime.length} titles on this page${totalLabel}`;
+                pageNumber.textContent = query
+                    ? `search · page ${currentPage}`
+                    : `page ${currentPage}`;
 
-                    pageNumber.textContent = `page ${currentPage} of ${totalPages}`;
-                    prevButton.disabled = currentPage <= 1;
-                    nextButton.disabled =
-                        currentPage >= totalPages || rawList.length === 0;
-                }
+                prevButton.disabled = currentPage <= 1;
+                nextButton.disabled = !hasNextPage;
             } catch (error) {
                 if (requestId !== catalogRequestId) return;
 
-                console.error("catalogue error:", error);
-
+                console.error("AniList catalogue error:", error);
                 animeGrid.innerHTML = `
                     <div class="empty-state">
                         <h3>couldn't load the catalogue.</h3>
@@ -1178,160 +1148,72 @@
                         <button class="action-button primary" id="retryButton">try again →</button>
                     </div>
                 `;
-
                 document.getElementById("retryButton")
                     ?.addEventListener("click", () => loadCatalog(currentPage));
-
                 resultCount.textContent = "catalogue unavailable";
                 nextButton.disabled = true;
             }
         }
 
-        function matchesSearch(anime, query) {
-            const fields = [
-                anime?.title,
-                anime?.name,
-                anime?.english_title,
-                anime?.englishTitle,
-                anime?.romaji,
-                anime?.japanese_title,
-                anime?.japaneseTitle,
-                anime?.synopsis,
-                anime?.description,
-                anime?.overview,
-                anime?.slug
-            ];
-
-            const titleObject = anime?.title;
-
-            if (titleObject && typeof titleObject === "object") {
-                fields.push(
-                    titleObject.english,
-                    titleObject.romaji,
-                    titleObject.native,
-                    titleObject.userPreferred
-                );
-            }
-
-            return fields.some(value =>
-                typeof value === "string" &&
-                value.toLowerCase().includes(query)
-            );
-        }
-
-        function getSortedAnime() {
-            const query = searchInput.value.trim().toLowerCase();
-
-            let list = query
-                ? [...searchResults]
-                : [...currentAnime];
-
-            const sort = sortSelect.value;
-
-            if (sort === "title-asc") {
-                list.sort((a, b) => getTitle(a).localeCompare(getTitle(b)));
-            } else if (sort === "title-desc") {
-                list.sort((a, b) => getTitle(b).localeCompare(getTitle(a)));
-            }
-
-            return list;
-        }
-
         function renderCatalog() {
             const query = searchInput.value.trim();
-            const searching = Boolean(query);
-            const list = getSortedAnime();
+            const list = getSortedAnime(currentAnime);
 
-            pagination.classList.toggle("hidden", searching);
+            animeGrid.innerHTML = "";
 
-            if (!searching) {
-                pageNumber.textContent = `page ${currentPage} of ${totalPages}`;
-                prevButton.disabled = currentPage <= 1;
-                nextButton.disabled = currentPage >= totalPages;
-            }
-
-            if (list.length === 0 && !searching) {
+            if (list.length === 0) {
                 animeGrid.innerHTML = `
                     <div class="empty-state">
-                        <h3>nothing here yet.</h3>
-                        <p>try another search or browse another page.</p>
+                        <h3>${query ? "no matches found." : "nothing here yet."}</h3>
+                        <p>${query
+                            ? "try another title or alternate spelling."
+                            : "try again in a moment, or browse another page."}</p>
                     </div>
                 `;
-
-                resultCount.textContent = "0 titles";
                 return;
             }
 
-            if (list.length === 0 && searching && searchInProgress) {
-                animeGrid.innerHTML = `
-                    <div class="status-panel">
-                        searching for “${escapeHTML(query)}”...
-                        <br>
-                        checked ${searchScannedPage} of ${searchTotalPages} pages so far.
-                    </div>
-                `;
-                resultCount.textContent = "searching...";
-                appendSearchStatus();
-                return;
-            }
+            animeGrid.innerHTML = list.map((anime, index) => {
+                const id = getAnimeId(anime);
+                const title = getTitle(anime);
+                const poster = getPoster(anime);
+                const type = String(firstValue(anime?.format, "anime"));
+                const score = Number(anime?.averageScore);
+                const imageMarkup = poster ? `
+                    <img
+                        src="${escapeHTML(poster)}"
+                        alt="${escapeHTML(title)}"
+                        loading="${index < 10 ? "eager" : "lazy"}"
+                        referrerpolicy="no-referrer"
+                    >
+                ` : "";
 
-            if (list.length === 0 && searching && !searchInProgress && !searchError) {
-                animeGrid.innerHTML = `
-                    <div class="empty-state">
-                        <h3>no matches found yet.</h3>
-                        <p>search more catalogue pages to keep looking.</p>
-                    </div>
-                `;
-            } else {
-                animeGrid.innerHTML = list.map((anime, index) => {
-                    const id = getAnimeId(anime);
-                    const title = getTitle(anime);
-                    const poster = getPoster(anime);
-                    const rating = getRating(anime);
-                    const type = firstValue(
-                        anime?.type,
-                        anime?.format,
-                        anime?.status,
-                        "anime"
-                    );
-
-                    const imageMarkup = poster
-                        ? `
-                            <img
-                                src="${escapeHTML(poster)}"
-                                alt="${escapeHTML(title)}"
-                                loading="${index < 10 ? "eager" : "lazy"}"
-                                referrerpolicy="no-referrer"
-                            >
-                        `
-                        : "";
-
-                    return `
-                        <button
-                            class="anime-card"
-                            type="button"
-                            data-anime-id="${escapeHTML(id ?? "")}"
-                            aria-label="view ${escapeHTML(title)}"
-                        >
-                            <div class="poster">
-                                ${imageMarkup}
-                                <div class="poster-placeholder ${poster ? "hidden" : ""}">
-                                    <span class="placeholder-mark">${escapeHTML(title.charAt(0).toLowerCase() || "a")}</span>
-                                    <span class="placeholder-title">${escapeHTML(title)}</span>
-                                </div>
+                return `
+                    <button
+                        class="anime-card"
+                        type="button"
+                        data-anime-id="${escapeHTML(id)}"
+                        aria-label="view ${escapeHTML(title)}"
+                    >
+                        <div class="poster">
+                            ${imageMarkup}
+                            <div class="poster-placeholder ${poster ? "hidden" : ""}">
+                                <span class="placeholder-mark">${escapeHTML(title.charAt(0).toLowerCase() || "a")}</span>
+                                <span class="placeholder-title">${escapeHTML(title)}</span>
                             </div>
-
-                            <div class="card-content">
-                                <h3 class="card-title">${escapeHTML(title)}</h3>
-                                <div class="card-meta">
-                                    <span class="tag live">${escapeHTML(type)}</span>
-                                    ${rating ? `<span class="tag alpha">${escapeHTML(rating)}</span>` : ""}
-                                </div>
+                        </div>
+                        <div class="card-content">
+                            <h3 class="card-title">${escapeHTML(title)}</h3>
+                            <div class="card-meta">
+                                <span class="tag live">${escapeHTML(type)}</span>
+                                ${Number.isFinite(score) && score > 0
+                                    ? `<span class="tag alpha">${(score / 10).toFixed(1)}/10</span>`
+                                    : ""}
                             </div>
-                        </button>
-                    `;
-                }).join("");
-            }
+                        </div>
+                    </button>
+                `;
+            }).join("");
 
             animeGrid.querySelectorAll(".anime-card").forEach(card => {
                 const image = card.querySelector(".poster img");
@@ -1348,344 +1230,6 @@
                     if (id) openSeries(id);
                 });
             });
-
-            if (searching) {
-                resultCount.textContent =
-                    `${list.length} matching title${list.length === 1 ? "" : "s"}`;
-
-                appendSearchStatus();
-            } else {
-                resultCount.textContent =
-                    `${list.length} title${list.length === 1 ? "" : "s"} shown`;
-            }
-        }
-
-        function appendSearchStatus() {
-            const query = searchInput.value.trim();
-
-            if (!query) return;
-
-            const existing = document.getElementById("searchStatus");
-            if (existing) existing.remove();
-
-            const status = document.createElement("div");
-            status.id = "searchStatus";
-            status.className = "search-progress";
-
-            if (searchError) {
-                status.innerHTML = `
-                    <p>search couldn't finish: ${escapeHTML(searchError)}</p>
-                    <br>
-                    <button class="action-button primary" id="retrySearchButton">
-                        try again →
-                    </button>
-                `;
-
-                status.querySelector("#retrySearchButton")
-                    ?.addEventListener("click", () => {
-                        searchError = null;
-                        scanSearchPages(searchToken);
-                    });
-            } else if (searchInProgress) {
-                status.textContent =
-                    `searching... checked ${searchScannedPage} of ${searchTotalPages} pages so far.`;
-            } else if (searchScannedPage >= searchTotalPages) {
-                status.textContent =
-                    `search complete · checked ${searchScannedPage} pages.`;
-            } else {
-                status.innerHTML = `
-                    <p>
-                        checked ${searchScannedPage} of ${searchTotalPages} pages.
-                        ${searchScannedPage === 0 ? "Search the catalogue to find more matches." : ""}
-                    </p>
-                    <br>
-                    <div style="display:flex;gap:10px;flex-wrap:wrap">
-                        <button class="action-button primary" id="searchMoreButton">
-                            search ${Math.min(SEARCH_BATCH_PAGES, searchTotalPages - searchScannedPage)} more pages →
-                        </button>
-                        <button class="action-button" id="searchAllButton">search all pages →</button>
-                    </div>
-                `;
-
-                status.querySelector("#searchMoreButton")
-                    ?.addEventListener("click", () => {
-                        scanSearchPages(searchToken);
-                    });
-
-                status.querySelector("#searchAllButton")
-                    ?.addEventListener("click", () => {
-                        if (searchTotalPages > AUTO_CONFIRM_LIMIT) {
-                            const ok = window.confirm(`This will fetch ${searchTotalPages} pages in parallel (concurrency ${SEARCH_ALL_CONCURRENCY}). Continue?`);
-                            if (!ok) return;
-                        }
-                        fetchAllSearchPages(searchToken);
-                    });
-            }
-
-            animeGrid.appendChild(status);
-        }
-
-        async function scanSearchPages(token) {
-            if (searchInProgress || token !== searchToken) return;
-
-            const query = searchInput.value.trim().toLowerCase();
-
-            if (!query) {
-                renderCatalog();
-                return;
-            }
-
-            searchInProgress = true;
-            searchError = null;
-
-            const startPage = searchScannedPage + 1;
-            const endPage = Math.min(
-                startPage + SEARCH_BATCH_PAGES - 1,
-                searchTotalPages
-            );
-
-            renderCatalog();
-
-            let consecutiveErrors = 0;
-
-            try {
-                for (let page = startPage; page <= endPage; page++) {
-                    if (token !== searchToken) return;
-
-                    let pageData;
-                    try {
-                        pageData = await fetchCatalogPage(page);
-                        consecutiveErrors = 0;
-                    } catch (error) {
-                        if (token !== searchToken) return;
-
-                        console.error(`search page ${page} error:`, error);
-                        consecutiveErrors += 1;
-                        searchError = `page ${page} failed: ${error.message}`;
-                        searchScannedPage = page;
-                        renderCatalog();
-
-                        if (consecutiveErrors >= MAX_CONSECUTIVE_PAGE_ERRORS) {
-                            searchError = `search paused after ${consecutiveErrors} consecutive page failures. Try again later.`;
-                            break;
-                        }
-
-                        await sleep(DELAY_BETWEEN_PAGES_MS);
-                        continue;
-                    }
-
-                    if (token !== searchToken) return;
-
-                    searchTotalPages = Math.max(
-                        1,
-                        pageData.pagination.totalPages
-                    );
-
-                    for (const anime of pageData.anime) {
-                        if (!matchesSearch(anime, query)) continue;
-
-                        const id = getAnimeId(anime);
-                        const key = id == null
-                            ? getTitle(anime).toLowerCase()
-                            : String(id);
-
-                        const alreadyAdded = searchResults.some(existing => {
-                            const existingId = getAnimeId(existing);
-                            const existingKey = existingId == null
-                                ? getTitle(existing).toLowerCase()
-                                : String(existingId);
-
-                            return existingKey === key;
-                        });
-
-                        if (!alreadyAdded) {
-                            searchResults.push(anime);
-                        }
-                    }
-
-                    searchScannedPage = page;
-                    renderCatalog();
-
-                    await sleep(DELAY_BETWEEN_PAGES_MS);
-                }
-            } catch (error) {
-                if (token !== searchToken) return;
-
-                console.error("search error (unexpected):", error);
-                searchError = error.message || "something went wrong.";
-            } finally {
-                if (token === searchToken) {
-                    searchInProgress = false;
-                    renderCatalog();
-                }
-            }
-        }
-
-        // Parallel "search all pages" with concurrency control and progressive updates.
-        async function fetchAllSearchPages(token) {
-            if (searchInProgress || token !== searchToken) return;
-
-            const query = searchInput.value.trim().toLowerCase();
-            if (!query) { renderCatalog(); return; }
-
-            searchInProgress = true;
-            searchError = null;
-
-            // Ensure page 1 is fetched to know total pages and process its results
-            try {
-                const page1 = await fetchCatalogPage(1);
-                searchTotalPages = Math.max(1, page1.pagination.totalPages);
-
-                // process page1 results (de-dup checks applied)
-                for (const anime of page1.anime) {
-                    if (!matchesSearch(anime, query)) continue;
-                    const id = getAnimeId(anime);
-                    const key = id == null ? getTitle(anime).toLowerCase() : String(id);
-                    const alreadyAdded = searchResults.some(existing => {
-                        const existingId = getAnimeId(existing);
-                        const existingKey = existingId == null ? getTitle(existing).toLowerCase() : String(existingId);
-                        return existingKey === key;
-                    });
-                    if (!alreadyAdded) searchResults.push(anime);
-                }
-
-                searchScannedPage = 1;
-                renderCatalog();
-            } catch (err) {
-                console.error("initial page fetch failed:", err);
-                searchError = `page 1 failed: ${err.message}`;
-                searchInProgress = false;
-                renderCatalog();
-                return;
-            }
-
-            const total = searchTotalPages;
-            const pages = [];
-            for (let p = 2; p <= total; p++) {
-                pages.push(p);
-            }
-
-            let active = 0;
-            let idx = 0;
-            let consecutiveErrors = 0;
-
-            return new Promise(resolve => {
-                async function next() {
-                    if (token !== searchToken) {
-                        searchInProgress = false;
-                        renderCatalog();
-                        resolve();
-                        return;
-                    }
-
-                    if (idx >= pages.length && active === 0) {
-                        searchInProgress = false;
-                        renderCatalog();
-                        resolve();
-                        return;
-                    }
-
-                    while (active < SEARCH_ALL_CONCURRENCY && idx < pages.length) {
-                        const page = pages[idx++];
-                        active++;
-
-                        (async (p) => {
-                            try {
-                                const pageData = await fetchCatalogPage(p);
-
-                                if (token !== searchToken) { active--; return; }
-
-                                searchTotalPages = Math.max(searchTotalPages, pageData.pagination.totalPages);
-
-                                for (const anime of pageData.anime) {
-                                    if (!matchesSearch(anime, query)) continue;
-                                    const id = getAnimeId(anime);
-                                    const key = id == null ? getTitle(anime).toLowerCase() : String(id);
-
-                                    const alreadyAdded = searchResults.some(existing => {
-                                        const existingId = getAnimeId(existing);
-                                        const existingKey = existingId == null ? getTitle(existing).toLowerCase() : String(existingId);
-                                        return existingKey === key;
-                                    });
-
-                                    if (!alreadyAdded) searchResults.push(anime);
-                                }
-
-                                // increment scanned count (approximate progress)
-                                searchScannedPage = Math.min(total, searchScannedPage + 1);
-                                consecutiveErrors = 0;
-                                renderCatalog();
-                            } catch (error) {
-                                console.error(`search page ${p} error (all):`, error);
-                                searchError = `page ${p} failed: ${error.message}`;
-                                consecutiveErrors += 1;
-                                if (consecutiveErrors >= MAX_CONSECUTIVE_PAGE_ERRORS) {
-                                    searchError = `search paused after ${consecutiveErrors} consecutive page failures. Try again later.`;
-                                    // stop scheduling further pages
-                                    idx = pages.length;
-                                }
-                                renderCatalog();
-                            } finally {
-                                active--;
-                                await sleep(60);
-                                next();
-                            }
-                        })(page);
-                    }
-
-                    if (active === 0 && idx >= pages.length) {
-                        searchInProgress = false;
-                        renderCatalog();
-                        resolve();
-                    }
-                }
-
-                next();
-            });
-        }
-
-        function startSearch() {
-            clearTimeout(searchTimer);
-
-            searchToken++;
-            const token = searchToken;
-
-            searchResults = [];
-            searchScannedPage = 0;
-            searchTotalPages = totalPages;
-            searchInProgress = false;
-            searchError = null;
-
-            const query = searchInput.value.trim();
-
-            if (!query) {
-                renderCatalog();
-                return;
-            }
-
-            animeGrid.innerHTML = `
-                <div class="status-panel">
-                    preparing to search the catalogue...
-                </div>
-            `;
-
-            resultCount.textContent = "searching...";
-            pagination.classList.add("hidden");
-
-            searchTimer = setTimeout(() => {
-                if (token === searchToken) {
-                    scanSearchPages(token);
-                }
-            }, 350);
-        }
-
-        function showCatalog() {
-            detailRequestId++;
-            detailView.classList.add("hidden");
-            catalogView.classList.remove("hidden");
-            selectedSeries = null;
-            selectedEpisode = null;
-            window.scrollTo({ top: 0, behavior: "smooth" });
         }
 
         async function openSeries(id) {
@@ -1699,49 +1243,33 @@
             selectedSeries = null;
             selectedEpisode = null;
             selectedLanguage = "sub";
-
             window.scrollTo({ top: 0, behavior: "smooth" });
 
             try {
-                const payload = await fetchJSON(
-                    `${API_BASE}/series/${encodeURIComponent(id)}`
-                );
+                let series = mediaCache.get(String(id));
+
+                if (!series) {
+                    const data = await fetchGraphQL(DETAIL_QUERY, { id: Number(id) });
+                    series = data?.Media;
+                } else {
+                    // Refresh the selected item so the detail view has a complete record.
+                    const data = await fetchGraphQL(DETAIL_QUERY, { id: Number(id) });
+                    series = data?.Media || series;
+                }
 
                 if (requestId !== detailRequestId) return;
 
-                const series = payload?.data?.anime ||
-                    payload?.anime ||
-                    payload?.data?.series ||
-                    payload?.series ||
-                    payload?.data ||
-                    payload;
-
-                const episodes = payload?.data?.episodes ||
-                    payload?.episodes ||
-                    series?.episodes ||
-                    [];
-
-                if (!series || typeof series !== "object") {
-                    throw new Error("series details weren't available.");
+                if (!series || !isSuitable(series)) {
+                    throw new Error("This title is unavailable or doesn't meet the content filter.");
                 }
 
-                if (!isSuitable(series)) {
-                    detailContent.innerHTML = `
-                        <div class="empty-state">
-                            <h3>this title isn't available.</h3>
-                            <p>this title doesn't meet the site's content filters.</p>
-                        </div>
-                    `;
-                    return;
-                }
-
-                selectedSeries = { ...series, episodes };
+                selectedSeries = series;
+                mediaCache.set(String(series.id), series);
                 renderSeries();
             } catch (error) {
                 if (requestId !== detailRequestId) return;
 
-                console.error("series error:", error);
-
+                console.error("AniList series error:", error);
                 detailContent.innerHTML = `
                     <div class="empty-state">
                         <h3>couldn't load this series.</h3>
@@ -1750,64 +1278,18 @@
                         <button class="action-button primary" id="retrySeries">try again →</button>
                     </div>
                 `;
-
                 document.getElementById("retrySeries")
                     ?.addEventListener("click", () => openSeries(id));
             }
         }
 
-        function getDescription(series) {
-            return String(firstValue(
-                series?.description,
-                series?.synopsis,
-                series?.overview,
-                series?.summary,
-                "no description is available for this series yet."
-            ));
-        }
+        function getEmbedURL(episodeNumber, language) {
+            const malId = getMalId(selectedSeries);
+            const number = Number(episodeNumber);
 
-        function getEpisodeNumber(episode, index) {
-            return firstValue(
-                episode?.number,
-                episode?.episode_number,
-                episode?.episode,
-                index + 1
-            );
-        }
+            if (!malId || !Number.isInteger(number) || number < 1) return "";
 
-        function getEmbedURL(episode, language) {
-            const explicitURL = language === "dub"
-                ? firstValue(episode?.dub_url, episode?.embed_url_dub)
-                : firstValue(episode?.sub_url, episode?.embed_url_sub);
-
-            if (explicitURL) {
-                try {
-                    const parsed = new URL(explicitURL);
-
-                    if (
-                        parsed.protocol === "https:" &&
-                        (
-                            parsed.hostname === "megaplay.buzz" ||
-                            parsed.hostname.endsWith(".megaplay.buzz")
-                        )
-                    ) {
-                        return parsed.href;
-                    }
-                } catch {
-                    // Fall back to the episode embed ID.
-                }
-            }
-
-            const embedId = firstValue(
-                language === "dub"
-                    ? episode?.dub_episode_embed_id
-                    : episode?.episode_embed_id,
-                episode?.episode_embed_id
-            );
-
-            if (!embedId) return "";
-
-            return `https://megaplay.buzz/stream/s-2/${encodeURIComponent(embedId)}/${language}`;
+            return `${MEGAPLAY_BASE}/${malId}/${number}/${language}`;
         }
 
         function renderSeries() {
@@ -1817,15 +1299,10 @@
             const title = getTitle(series);
             const poster = getPoster(series);
             const genres = getGenres(series);
-            const rating = getRating(series);
-            const episodes = Array.isArray(series.episodes)
-                ? [...series.episodes]
-                : [];
-
-            episodes.sort((a, b) =>
-                Number(getEpisodeNumber(a, 0)) -
-                Number(getEpisodeNumber(b, 0))
-            );
+            const episodes = makeEpisodes(series);
+            const malId = getMalId(series);
+            const score = Number(series.averageScore);
+            const description = getDescription(series);
 
             const posterMarkup = poster
                 ? `<img src="${escapeHTML(poster)}" alt="${escapeHTML(title)}" referrerpolicy="no-referrer">`
@@ -1846,19 +1323,24 @@
                         <h1>${escapeHTML(title)}</h1>
 
                         <div class="detail-tags">
-                            ${rating ? `<span class="tag live">${escapeHTML(rating)}</span>` : ""}
-                            ${firstValue(series.type, series.format)
-                                ? `<span class="tag alpha">${escapeHTML(firstValue(series.type, series.format))}</span>`
+                            ${series.format ? `<span class="tag live">${escapeHTML(series.format)}</span>` : ""}
+                            ${Number.isFinite(score) && score > 0
+                                ? `<span class="tag alpha">${(score / 10).toFixed(1)}/10</span>`
                                 : ""}
                             ${episodes.length
-                                ? `<span class="tag soon">${episodes.length} episodes</span>`
+                                ? `<span class="tag soon">${episodes.length} episodes listed</span>`
                                 : ""}
                             ${genres.map(genre =>
                                 `<span class="tag soon">${escapeHTML(genre)}</span>`
                             ).join("")}
                         </div>
 
-                        <p class="detail-description">${escapeHTML(getDescription(series))}</p>
+                        <p class="detail-description">${escapeHTML(description)}</p>
+                        ${!malId ? `
+                            <p class="player-note">
+                                This title doesn't have a MAL ID in AniList, so the MAL-based player can't identify it.
+                            </p>
+                        ` : ""}
                     </div>
                 </div>
 
@@ -1871,20 +1353,18 @@
                 <section id="playerPanel" class="player-panel">
                     <div class="player-header">
                         <h2 id="playerTitle">choose an episode</h2>
-
                         <div class="language-controls">
-                            <button class="language-button active" data-language="sub">sub</button>
-                            <button class="language-button" data-language="dub">dub</button>
+                            <button class="language-button active" data-language="sub" type="button">sub</button>
+                            <button class="language-button" data-language="dub" type="button">dub</button>
                         </div>
                     </div>
 
                     <div id="videoFrame" class="video-frame">
-                        <div class="video-placeholder">choose an episode to begin watching.</div>
+                        <div class="video-placeholder">choose an episode to begin.</div>
                     </div>
 
                     <p class="player-note">
-                        playback is provided by a third-party service. if an episode doesn't load,
-                        try switching between sub and dub when available.
+                        Playback uses the show's MAL ID and episode number. Availability can vary by title and language.
                     </p>
                 </section>
             `;
@@ -1894,42 +1374,30 @@
             if (episodes.length === 0) {
                 episodeList.innerHTML = `
                     <div class="empty-state">
-                        no episodes were returned for this series.
+                        AniList doesn't list an episode count for this title, so episode buttons can't be generated automatically.
                     </div>
                 `;
             } else {
-                episodeList.innerHTML = episodes.map((episode, index) => {
-                    const number = getEpisodeNumber(episode, index);
-                    const episodeTitle = String(firstValue(
-                        episode?.title,
-                        episode?.name,
-                        `episode ${number}`
-                    ));
-
-                    return `
-                        <button
-                            class="episode-button"
-                            type="button"
-                            data-episode-index="${index}"
-                        >
-                            <span class="episode-number">episode ${escapeHTML(number)}</span>
-                            <span class="episode-title">${escapeHTML(episodeTitle)}</span>
-                        </button>
-                    `;
-                }).join("");
+                episodeList.innerHTML = episodes.map((episode, index) => `
+                    <button
+                        class="episode-button"
+                        type="button"
+                        data-episode-index="${index}"
+                    >
+                        <span class="episode-number">episode ${episode.number}</span>
+                        <span class="episode-title">${escapeHTML(episode.title)}</span>
+                    </button>
+                `).join("");
 
                 episodeList.querySelectorAll(".episode-button").forEach(button => {
                     button.addEventListener("click", () => {
-                        selectEpisode(
-                            episodes[Number(button.dataset.episodeIndex)],
-                            Number(button.dataset.episodeIndex)
-                        );
+                        const index = Number(button.dataset.episodeIndex);
+                        selectEpisode(episodes[index], index);
                     });
                 });
             }
 
             const detailPosterImage = detailContent.querySelector(".detail-poster img");
-
             if (detailPosterImage) {
                 detailPosterImage.addEventListener("error", () => {
                     detailPosterImage.remove();
@@ -1938,11 +1406,11 @@
                 }, { once: true });
             }
 
-            document.querySelectorAll(".language-button").forEach(button => {
+            detailContent.querySelectorAll(".language-button").forEach(button => {
                 button.addEventListener("click", () => {
                     selectedLanguage = button.dataset.language;
 
-                    document.querySelectorAll(".language-button").forEach(item => {
+                    detailContent.querySelectorAll(".language-button").forEach(item => {
                         item.classList.toggle(
                             "active",
                             item.dataset.language === selectedLanguage
@@ -1950,10 +1418,7 @@
                     });
 
                     if (selectedEpisode) {
-                        playEpisode(
-                            selectedEpisode.episode,
-                            selectedEpisode.index
-                        );
+                        playEpisode(selectedEpisode.episode, selectedEpisode.index);
                     }
                 });
             });
@@ -1973,43 +1438,40 @@
         }
 
         function playEpisode(episode, index) {
-            const number = getEpisodeNumber(episode, index);
-            const episodeTitle = String(firstValue(
-                episode?.title,
-                episode?.name,
-                `episode ${number}`
-            ));
-
-            const url = getEmbedURL(episode, selectedLanguage);
+            const number = Number(episode?.number || index + 1);
+            const url = getEmbedURL(number, selectedLanguage);
+            const title = getTitle(selectedSeries);
             const playerTitle = document.getElementById("playerTitle");
             const videoFrame = document.getElementById("videoFrame");
 
-            playerTitle.textContent =
-                `${selectedSeries ? getTitle(selectedSeries) : "anime"} — ${episodeTitle}`;
+            playerTitle.textContent = `${title} — episode ${number}`;
 
-            if (!url) {
+            if (!getMalId(selectedSeries)) {
                 videoFrame.innerHTML = `
                     <div class="video-placeholder">
-                        no ${selectedLanguage === "sub" ? "subbed" : "dubbed"}
-                        stream was provided for this episode.
+                        no MAL ID is available for this title, so the player can't build an episode link.
                     </div>
                 `;
                 return;
             }
 
-            const parsed = new URL(url);
-
-            if (
-                parsed.protocol !== "https:" ||
-                !(
-                    parsed.hostname === "megaplay.buzz" ||
-                    parsed.hostname.endsWith(".megaplay.buzz")
-                )
-            ) {
+            if (!url) {
                 videoFrame.innerHTML = `
                     <div class="video-placeholder">
-                        the supplied video link isn't supported.
+                        couldn't create the episode link. please choose another episode.
                     </div>
+                `;
+                return;
+            }
+
+            // The URL is built locally from a fixed trusted host and numeric values.
+            const parsed = new URL(url);
+            if (
+                parsed.protocol !== "https:" ||
+                parsed.hostname !== "megaplay.buzz"
+            ) {
+                videoFrame.innerHTML = `
+                    <div class="video-placeholder">the video link isn't supported.</div>
                 `;
                 return;
             }
@@ -2029,61 +1491,35 @@
         }
 
         prevButton.addEventListener("click", () => {
-            if (currentPage > 1 && !searchInput.value.trim()) {
+            if (currentPage > 1) {
                 loadCatalog(currentPage - 1);
                 window.scrollTo({ top: 0, behavior: "smooth" });
             }
         });
 
         nextButton.addEventListener("click", () => {
-            if (currentPage < totalPages && !searchInput.value.trim()) {
+            if (hasNextPage) {
                 loadCatalog(currentPage + 1);
                 window.scrollTo({ top: 0, behavior: "smooth" });
             }
         });
 
-        searchInput.addEventListener("input", startSearch);
+        searchInput.addEventListener("input", () => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => loadCatalog(1), SEARCH_DEBOUNCE_MS);
+        });
 
         sortSelect.addEventListener("change", renderCatalog);
 
-        document.getElementById("backToCatalog")
-            .addEventListener("click", showCatalog);
+        document.getElementById("backToCatalog").addEventListener("click", () => {
+            detailRequestId++;
+            detailView.classList.add("hidden");
+            catalogView.classList.remove("hidden");
+            selectedSeries = null;
+            selectedEpisode = null;
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        });
 
-        if (filterToggle) {
-            function updateFilterUI() {
-                filterToggle.setAttribute("aria-pressed", contentFilterEnabled ? "true" : "false");
-                filterToggle.textContent = `filter: ${contentFilterEnabled ? "on" : "off"}`;
-                filterToggle.title = contentFilterEnabled
-                    ? "Content filter is on. Click to show unfiltered content."
-                    : "Content filter is off. Click to enable filtering.";
-            }
-
-            filterToggle.addEventListener("click", () => {
-                contentFilterEnabled = !contentFilterEnabled;
-                updateFilterUI();
-
-                searchPageCache.clear();
-
-                searchToken++;
-                searchResults = [];
-                searchScannedPage = 0;
-                searchTotalPages = totalPages;
-                searchInProgress = false;
-                searchError = null;
-
-                if (!catalogView.classList.contains("hidden")) {
-                    loadCatalog(1);
-                } else if (lastOpenedSeriesId) {
-                    openSeries(lastOpenedSeriesId);
-                } else {
-                    loadCatalog(1);
-                }
-            });
-
-            updateFilterUI();
-        }
-
-        // initial load
         loadCatalog(1);
     </script>
 </body>
